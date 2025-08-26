@@ -6,3 +6,4 @@ npm-debug.log
 .gitignore
 tests
 uploads
+src

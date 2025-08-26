@@ -20,5 +20,5 @@ export const updateArtistValidator = [
 ];
 
 export const artistIdValidator = [
-  param("artistId").isMongoId().withMessage("Invalid artist ID"),
+  param("id").isMongoId().withMessage("Invalid artist ID"),
 ];

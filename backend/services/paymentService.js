@@ -12,6 +12,7 @@ export const markTransactionPaid = async ({
   subscriptionId,
 }) => {
   let query = {};
+  console.log("🔍 Marking transaction as paid:")
 
   if (!gateway) {
     console.warn("⚠️ No payment gateway provided. Cannot mark transaction as paid.");

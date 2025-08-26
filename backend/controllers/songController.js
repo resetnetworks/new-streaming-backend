@@ -46,7 +46,6 @@ export const createSong = async (req, res) => {
     genre = genre.split(",").map((g) => g.trim());
   }
 
-  // Convert string values to proper types
   if (typeof albumOnly === "string") {
     albumOnly = albumOnly === "true";
   }
@@ -55,37 +54,29 @@ export const createSong = async (req, res) => {
     price = parseFloat(price);
   }
 
-  // Validation for purchase-only songs
   if (accessType === "purchase-only" && !albumOnly && (!price || price <= 0)) {
     throw new BadRequestError("Purchase-only songs must have a valid price.");
   }
 
-  // Set final price based on access type and album-only status
   let finalPrice = 0;
   if (accessType === "purchase-only") {
-    if (albumOnly) {
-      finalPrice = 0; // Album-only songs can't be purchased individually
-    } else {
-      finalPrice = price; // Use the provided price for individual purchase
-    }
-  } else {
-    finalPrice = 0; // Subscription songs are free
+    finalPrice = albumOnly ? 0 : price;
   }
 
-  const coverImageFile = req.files?.coverImage?.[0];
-  const audioFile = req.files?.audio?.[0];
-
-  if (!audioFile) {
+  // ✅ File checks
+  if (!req.files?.audio?.[0]) {
     throw new BadRequestError("Audio file is required.");
   }
 
-  const audioUrl = await uploadToS3(audioFile, "songs");
-  const coverImageUrl = coverImageFile
-    ? await uploadToS3(coverImageFile, "covers")
-    : "";
+  const albumImage  = await Album.findById(album).select("coverImage").lean();
+
+  const audioUrl = req.files.audio[0].location;
+  const coverImageUrl = req.files?.coverImage?.[0]?.location || albumImage?.coverImage || "";
+  console.log("Audio URL:", coverImageUrl);
 
   const audioKey = audioUrl.split("/").pop().replace(/\.[^/.]+$/, "");
 
+  
   const newSong = await Song.create({
     title,
     artist,
@@ -93,7 +84,7 @@ export const createSong = async (req, res) => {
     genre,
     duration,
     accessType: accessType || "subscription",
-    price: finalPrice, // Use the calculated final price
+    price: finalPrice,
     releaseDate,
     coverImage: coverImageUrl,
     albumOnly: albumOnly || false,
@@ -105,15 +96,14 @@ export const createSong = async (req, res) => {
     await Album.findByIdAndUpdate(album, {
       $push: { songs: newSong._id },
     });
-   }
+  }
 
-  // Populate artist (for frontend display)
   const populated = await Song.findById(newSong._id)
-    .populate("artist", "name image")
+    .populate("artist", "name image slug")
     .populate("album", "title coverImage")
     .lean();
 
-  const response = shapeSongResponse(populated, false); // No access yet, signed URL not needed
+  const response = shapeSongResponse(populated, false);
 
   res.status(StatusCodes.CREATED).json({
     success: true,
@@ -199,7 +189,7 @@ export const updateSong = async (req, res) => {
 
   // 📦 Re-fetch the updated song with populated artist/album
   const updatedSong = await Song.findById(song._id)
-    .populate("artist", "name image")
+    .populate("artist", "name image slug")
     .populate("album", "title coverImage")
     .lean();
 
@@ -293,7 +283,7 @@ export const getAllSongs = async (req, res) => {
     .sort(sortOption)
     .skip(skip)
     .limit(limit)
-    .populate("artist", "name image")
+    .populate("artist", "name image slug")
     .populate("album", "title coverImage")
     .lean();
 
@@ -330,7 +320,7 @@ export const getSongById = async (req, res) => {
   const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
 
   const song = await Song.findOne(isValidObjectId ? { _id: id } : { slug: id })
-    .populate("artist", "name image")
+    .populate("artist", "name image slug")
     .populate("album", "title coverImage")
     .lean();
 
@@ -397,7 +387,7 @@ export const getSongsMatchingUserGenres = async (req, res) => {
   // 4. Fetch matching songs
   const [songs, total] = await Promise.all([
     Song.find({ genre: { $in: genreArray } })
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -451,7 +441,7 @@ export const getSongsByGenre = async (req, res) => {
       .sort({ releaseDate: -1 })
       .skip(skip)
       .limit(pageLimit)
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .lean(),
     Song.countDocuments(query),
@@ -507,7 +497,7 @@ export const getSongsByArtist = async (req, res) => {
       .sort({ releaseDate: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .lean(),
     Song.countDocuments(query),
@@ -570,7 +560,7 @@ export const getSongsByAlbum = async (req, res) => {
       .sort({ releaseDate: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .lean(),
     Song.countDocuments(query),
@@ -624,7 +614,7 @@ export const getPurchasedSongs = async (req, res) => {
       .sort({ releaseDate: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .lean(),
     Song.countDocuments({ _id: { $in: user.purchasedSongs } }),
@@ -669,7 +659,7 @@ export const getPremiumSongs = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("artist", "name image")
+      .populate("artist", "name image slug")
       .populate("album", "title coverImage")
       .lean()
   ]);
@@ -717,7 +707,7 @@ export const getLikedSongs = async (req, res) => {
 
   // 3. Get song details from Song model
   const songs = await Song.find({ _id: { $in: paginatedIds } })
-    .populate("artist", "name image")
+    .populate("artist", "name image slug")
     .populate("album", "title coverImage")
     .lean();
 

@@ -2,7 +2,7 @@ import { body, param } from "express-validator";
 
 export const createAlbumValidator = [
   body("title").trim().notEmpty().withMessage("Title is required"),
-  body("description").optional().trim().escape(),
+  body("description").optional().trim(),
   body("artist").notEmpty().withMessage("Artist is required"),
   body("releaseDate").optional().isISO8601().toDate().withMessage("Invalid release date"),
   body("price").optional().isNumeric().withMessage("Price must be a number"),

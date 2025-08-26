@@ -39,10 +39,8 @@ export const createAlbum = async (req, res) => {
   }
 
   // ☁️ Handle cover image upload
-  const coverImageFile = req.files?.coverImage?.[0];
-  const coverImageUrl = coverImageFile
-    ? await uploadToS3(coverImageFile, "covers")
-    : "";
+  const coverImageUrl = req.files?.coverImage?.[0]?.location;
+  console.log("Cover Image URL:", coverImageUrl);
 
   // 🎵 Normalize genre field
   const processedGenre =

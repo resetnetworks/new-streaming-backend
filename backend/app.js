@@ -37,6 +37,12 @@ import passport from "./middleware/passport.js";
 import notFoundMiddleware from "./middleware/not-found.js";
 import errorHandlerMiddleware from "./middleware/errorhandler.js";
 
+// import { registerPaymentEventHandlers } from "./payment/events/paymentEventHandlers.js";
+// import { registerPaymentSubscribers } from "./features/payment/subscribers/index.js";
+//    registerPaymentSubscribers();
+
+// registerPaymentEventHandlers();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();

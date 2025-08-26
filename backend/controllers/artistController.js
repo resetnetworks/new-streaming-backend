@@ -34,7 +34,7 @@ export const createArtist = async (req, res) => {
 
   // ☁️ Optional image upload
   const imageFile = req.files?.coverImage?.[0];
-  const imageUrl = imageFile ? await uploadToS3(imageFile, "artists") : "";
+  const imageUrl = req.files?.coverImage?.[0].location || "";
 
 
   // 🎨 Create artist

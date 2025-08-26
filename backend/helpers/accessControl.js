@@ -5,7 +5,10 @@ import { Album } from "../models/Album.js";
 import { isAdmin } from "../utils/authHelper.js";
 
 export const canStreamSong = async (userId, songId) => {
-
+  console.log(`Checking stream access for user ${userId} on song ${songId}`);
+  const user = await User.findById(userId).lean();
+ if(isAdmin(user)) return true; // Admins can access everything
+ 
   
   const song = await Song.findById(songId).lean();
   if (!song) return false;

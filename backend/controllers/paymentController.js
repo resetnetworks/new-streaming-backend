@@ -6,7 +6,7 @@ import { Album } from "../models/Album.js";
 import { createStripePaymentIntent } from "../utils/stripe.js";
 import { createRazorpayOrder as createRazorpayOrderUtil } from "../utils/razorpay.js";
 import { log } from "console";
-
+import { Subscription } from "../models/Subscription.js";
 // ✅ Stripe: Purchase song, album, or artist-subscription
 export const createStripePayment = async (req, res) => {
 const { itemType, itemId, amount, currency = "INR" } = req.body;
@@ -82,6 +82,14 @@ export const createRazorpayOrder = async (req, res) => {
     if (!album) throw new NotFoundError("Album not found");
     artistId = album.artist;
   }
+    const subscription = await Subscription.findOne({
+        userId,
+        artistId,
+        status: { $in: ["active", "cancelled"] }, 
+      });
+  
+      if (!subscription) 
+         return res.status(400).json({ "message" : "No active subscription found for this artist.", artistId });
 
   // ✅ Create Razorpay Order
 const razorpayOrder = await createRazorpayOrderUtil(amount, userId, itemType, itemId);

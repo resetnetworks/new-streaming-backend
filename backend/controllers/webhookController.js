@@ -165,6 +165,7 @@ export const razorpayWebhook = async (req, res) => {
       .createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
+   
 
     if (signature !== expectedSignature) {
       console.error("❌ Invalid Razorpay signature");
@@ -173,14 +174,22 @@ export const razorpayWebhook = async (req, res) => {
 
     const eventData = JSON.parse(rawBody.toString());
     const event = eventData.event;
+    console.log(`📥 Razorpay event received: ${eventData}`);
+    
 
     if (event === "payment.captured") {
       const paymentEntity = eventData.payload.payment.entity;
       const paymentId = paymentEntity.id;
       const razorpayOrderId = paymentEntity.order_id;
+     
+      
 
-      const fullPayment = await razorpay.payments.fetch(paymentId);
+      // const fullPayment = await razorpay.payments.fetch(paymentId);
+      // const paymentEntity = eventData.payload.payment.entity;
+      const fullPayment = paymentEntity; 
       let subscriptionId = null;
+     
+      
 
       if (fullPayment.invoice_id) {
         const invoice = await razorpay.invoices.fetch(fullPayment.invoice_id);
