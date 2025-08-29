@@ -14,6 +14,14 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    // 🔑 Which subscription cycle was chosen
+    cycle: {
+      type: String,
+      enum: ["1m", "3m", "6m", "12m"],
+      required: true,
+    },
+
     startedAt: {
       type: Date,
       default: Date.now,
@@ -23,6 +31,7 @@ const subscriptionSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+
     status: {
       type: String,
       enum: ["active", "expired", "cancelled"],
@@ -56,7 +65,9 @@ const subscriptionSchema = new mongoose.Schema(
   }
 );
 
-// Unique: a user can have only one active subscription per artist
+// ✅ Ensure one active subscription per artist per user
 subscriptionSchema.index({ userId: 1, artistId: 1 }, { unique: true });
 
-export const Subscription = mongoose.model("Subscription", subscriptionSchema);
+export const Subscription =
+  mongoose.models.Subscription ||
+  mongoose.model("Subscription", subscriptionSchema);

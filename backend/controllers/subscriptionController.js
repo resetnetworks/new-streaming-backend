@@ -215,45 +215,71 @@ export const createSetupIntent = async (req, res) => {
   res.status(200).json({ clientSecret: setupIntent.client_secret });
 };
 
+const PLAN_DURATION_MAP = {
+  3: 3,
+  6: 6,
+  12: 12,
+};
+
 
 export const createRazorpaySubscription = async (req, res) => {
-  const { artistId } = req.params;
-  const user = req.user;
-  console.log(artistId, user._id);
-  
+  try {
+    const { artistId } = req.params;
+    const { cycle } = req.body; // "1m", "3m", "6m", "12m"
+    const user = req.user;
 
-  const artist = await Artist.findById(artistId).select(
-    "razorpayPlanId subscriptionPrice"
-  );
-  if (!artist || !artist.razorpayPlanId) {
-    throw new Error("Artist subscription not available");
+    // Validate cycle
+    const validCycles = ["1m", "3m", "6m", "12m"];
+    if (!validCycles.includes(cycle)) {
+      throw new BadRequestError("Invalid subscription cycle. Use 1m, 3m, 6m, or 12m.");
+    }
+
+    // ✅ Fetch artist and the correct plan
+    const artist = await Artist.findById(artistId).select("subscriptionPlans name");
+    if (!artist) {
+      throw new NotFoundError("Artist not found");
+    }
+
+    const plan = artist.subscriptionPlans.find((p) => p.cycle === cycle);
+    if (!plan || !plan.razorpayPlanId) {
+      throw new NotFoundError(`No Razorpay plan found for cycle ${cycle}`);
+    }
+
+    // ✅ Create Razorpay subscription
+    const subscription = await razorpay.subscriptions.create({
+      plan_id: plan.razorpayPlanId,
+      total_count: cycle === "1m" ? 1 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12, // number of billing cycles
+      customer_notify: 1,
+      notes: {
+        userId: user._id.toString(),
+        artistId: artistId.toString(),
+        cycle,
+      },
+    });
+
+    // ✅ Save transaction as pending
+    await Transaction.create({
+      userId: user._id,
+      itemType: "artist-subscription",
+      itemId: artistId,
+      artistId,
+      amount: plan.price, // per-cycle price (not multiplied, because Razorpay charges per cycle)
+      currency: "INR",
+      gateway: "razorpay",
+      status: "pending",
+      metadata: {
+        razorpaySubscriptionId: subscription.id,
+        cycle,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      subscriptionId: subscription.id,
+      cycle,
+    });
+  } catch (error) {
+    console.log("❌ Error creating Razorpay subscription:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
-
-  const subscription = await razorpay.subscriptions.create({
-    plan_id: artist.razorpayPlanId,
-    total_count: 12, // 12 months, or set null for "infinite until cancel"
-    customer_notify: 1,
-    notes: {
-      userId: user._id.toString(),
-      artistId: artistId.toString(),
-    },
-  });
-
-  // ✅ Save transaction as pending
-  await Transaction.create({
-    userId: user._id,
-    itemType: "artist-subscription",
-    itemId: artistId,
-    artistId,
-    amount: artist.subscriptionPrice,
-    currency: "INR",
-    gateway: "razorpay",
-    status: "pending",
-    metadata: { razorpaySubscriptionId: subscription.id },
-  });
-
-  res.status(201).json({
-    success: true,
-    subscriptionId: subscription.id,
-  });
 };

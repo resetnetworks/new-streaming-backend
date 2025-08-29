@@ -5,6 +5,9 @@ import { Subscription } from "../models/Subscription.js";
 import {markTransactionPaid, updateUserAfterPurchase,} from "../services/paymentService.js";
 import { WebhookEventLog } from "../models/WebhookEventLog.js";
 import Razorpay from "razorpay";
+import { log } from "console";
+import { User } from "../models/User.js";
+import { sendInvoiceEmail } from "../utils/email.js";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -156,6 +159,8 @@ await WebhookEventLog.create({
 
 
 export const razorpayWebhook = async (req, res) => {
+  console.log("📡 Razorpay webhook called");
+  
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     const signature = req.headers["x-razorpay-signature"];
@@ -208,6 +213,16 @@ export const razorpayWebhook = async (req, res) => {
         if (transaction) {
           await updateUserAfterPurchase(transaction, subscriptionId);
           console.log("✅ Subscription activated/renewed");
+            if (fullPayment.invoice_id) {
+      const invoice = await razorpay.invoices.fetch(fullPayment.invoice_id);
+
+      // send invoice email
+      const user = await User.findById(transaction.userId);
+      if (user?.email) {
+        await sendInvoiceEmail("bilalforwin@gmail.com", invoice);
+        console.log("📧 Invoice email sent");
+      }
+    }
         }
 
         return res.status(200).json({ status: "subscription processed" });
@@ -232,6 +247,7 @@ export const razorpayWebhook = async (req, res) => {
 
       if (transaction) {
         await updateUserAfterPurchase(transaction, paymentId);
+      
         console.log("✅ One-time purchase completed:", type, itemId);
       }
 

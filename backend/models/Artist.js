@@ -4,6 +4,32 @@ import { customAlphabet } from "nanoid";
 
 const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
+const subscriptionPlanSchema = new mongoose.Schema(
+  {
+    cycle: {
+      type: String,
+      enum: ["1m", "3m", "6m", "12m"], // subscription cycle in months
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: [0, "Price cannot be negative"],
+    },
+    razorpayPlanId: {
+      type: String,
+      required: [true, "Razorpay plan ID is required"],
+      trim: true,
+    },
+    stripePriceId: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+  },
+  { _id: false } // prevent extra _id for subdocs
+);
+
 const artistSchema = new mongoose.Schema(
   {
     name: {
@@ -17,6 +43,7 @@ const artistSchema = new mongoose.Schema(
       type: String,
       required: true,
       lowercase: true,
+      unique: true, // ✅ enforce uniqueness at DB level
       trim: true,
       match: [/^[a-z0-9-]+$/, "Slug must be lowercase and URL-friendly"],
     },
@@ -25,7 +52,6 @@ const artistSchema = new mongoose.Schema(
       maxlength: 100,
       default: "",
       trim: true,
-      minlength: 2,
     },
     bio: {
       type: String,
@@ -38,26 +64,28 @@ const artistSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
-    subscriptionPrice: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
+
+    // 💳 Multiple subscription cycles
+    subscriptionPlans: {
+      type: [subscriptionPlanSchema],
+      validate: {
+        validator: function (plans) {
+          const cycles = plans.map((p) => p.cycle);
+          return new Set(cycles).size === cycles.length; // prevent duplicate cycles
+        },
+        message: "Duplicate subscription cycles are not allowed",
+      },
+      default: [],
     },
-    stripePriceId: {
-      type: String,
-      default: null,
-      trim: true,
-    },
-    razorpayPlanId: { 
-      type:String , 
-      default: null,
-      trim: true },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
+
+    // ⚡ store subscriber references (not for counting, use Subscription collection instead)
     subscribers: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -68,7 +96,6 @@ const artistSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-
 // 🔁 Auto-generate unique slug before validation
 artistSchema.pre("validate", function (next) {
   if (!this.slug && this.name) {
@@ -78,8 +105,9 @@ artistSchema.pre("validate", function (next) {
   next();
 });
 
-// Indexes for fast lookup
+// 📈 Indexes for fast lookup
 artistSchema.index({ name: 1 });
-artistSchema.index({ slug: 1 });
+artistSchema.index({ slug: 1 }, { unique: true });
 
-export const Artist = mongoose.models.Artist || mongoose.model("Artist", artistSchema);
+export const Artist =
+  mongoose.models.Artist || mongoose.model("Artist", artistSchema);

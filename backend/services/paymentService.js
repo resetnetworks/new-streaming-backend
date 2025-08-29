@@ -2,6 +2,11 @@ import { Transaction } from "../models/Transaction.js";
 import { User } from "../models/User.js";
 import { Subscription } from "../models/Subscription.js";
 
+const subscriptionDuration = {
+  "1m": 30,   // 30 days
+  "3m": 90,   // 90 days
+  "6m": 180   // 180 days
+};
 // ✅ Mark transaction as paid
 export const markTransactionPaid = async ({
   gateway,
@@ -88,7 +93,8 @@ export const updateUserAfterPurchase = async (transaction, paymentId) => {
       break;
 
     case "artist-subscription": {
-      let validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // default: +30 days
+      const daysToAdd = subscriptionDuration[transaction.metadata?.cycle] || 30;
+      let validUntil = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000); // default: +30 days
    const fallbackExternalId =
   transaction.metadata?.externalSubscriptionId || // top priority
   transaction.metadata?.razorpaySubscriptionId || // fallback if above not present

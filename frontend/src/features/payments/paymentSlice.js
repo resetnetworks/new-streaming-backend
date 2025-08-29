@@ -75,7 +75,7 @@ export const initiateRazorpaySubscription = createAsyncThunk(
   'payment/initiateRazorpaySubscription',
   async (artistId, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post(`/subscriptions/artist/${artistId}`);
+      const response = await axiosInstance.post(`/subscriptions/artist/${artistId}`, {"cycle":"3m",});
       return response.data; // { success: true, subscriptionId }
     } catch (error) {
       console.log(error.response?.data?.message || 'Razorpay subscription failed');

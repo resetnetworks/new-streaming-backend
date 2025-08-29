@@ -12,6 +12,20 @@ import { log } from "console";
 import { createArtistStripeSubscriptionPrice } from "../utils/stripe.js";
 import { createRazorpayPlan } from "../utils/razorpay.js";
 
+const cycleToInterval = (cycle) => {
+  switch (cycle) {
+    case "1m":
+      return { stripe: { interval: "month", interval_count: 1 }, razorpay: { period: "monthly", interval: 1 } };
+    case "3m":
+      return { stripe: { interval: "month", interval_count: 3 }, razorpay: { period: "monthly", interval: 3 } };
+    case "6m":
+      return { stripe: { interval: "month", interval_count: 6 }, razorpay: { period: "monthly", interval: 6 } };
+    case "12m":
+      return { stripe: { interval: "year", interval_count: 1 }, razorpay: { period: "yearly", interval: 1 } };
+    default:
+      throw new BadRequestError("Invalid subscription cycle. Use 1m, 3m, 6m, or 12m.");
+  }
+};
 
 
 // ===================================================================
@@ -20,56 +34,60 @@ import { createRazorpayPlan } from "../utils/razorpay.js";
 // @access  Admin
 // ===================================================================
 export const createArtist = async (req, res) => {
-  // 🔒 Admin check
   if (!isAdmin(req.user)) {
     throw new UnauthorizedError("Access denied. Admins only.");
   }
 
-  const { name, bio, location, subscriptionPrice } = req.body;
+  const { name, bio, location, subscriptionPrice, cycle } = req.body;
 
-  // 🛡️ Basic validation
-  if (!name) {
-    throw new BadRequestError("Artist name is required.");
-  }
+  if (!name) throw new BadRequestError("Artist name is required.");
+  if (!cycle) throw new BadRequestError("Subscription cycle is required (1m, 3m, 6m, 12m).");
 
-  // ☁️ Optional image upload
+  const { stripe, razorpay } = cycleToInterval(cycle);
+
   const imageFile = req.files?.coverImage?.[0];
-  const imageUrl = req.files?.coverImage?.[0].location || "";
+  const imageUrl = imageFile?.location || "";
 
-
-  // 🎨 Create artist
   const artist = await Artist.create({
     name,
     bio,
-    subscriptionPrice,
     location,
     image: imageUrl,
     createdBy: req.user._id,
   });
-   if (artist.subscriptionPrice && artist.subscriptionPrice > 0) {
-  const priceId = await createArtistStripeSubscriptionPrice(artist.name, artist.subscriptionPrice);
-  artist.stripePriceId = priceId;
-  await artist.save();
 
-  if (!artist.razorpayPlanId) {
-  artist.razorpayPlanId = await createRazorpayPlan(
-    artist.name,
-    artist.subscriptionPrice
-  );
-  await artist.save();
-}
+  if (subscriptionPrice && subscriptionPrice > 0) {
+    // Stripe subscription price
+    const stripePriceId = await createArtistStripeSubscriptionPrice(
+      artist.name,
+      subscriptionPrice,
+      stripe.interval,
+      stripe.interval_count
+    );
 
+    // Razorpay plan
+    const razorpayPlanId = await createRazorpayPlan(
+      artist.name,
+      subscriptionPrice,
+      razorpay.interval,
+      razorpay.period,
+    );
 
-  // ✂️ Shape response
-  const shaped = await shapeArtistResponse(artist.toObject())
-  console.log("Created artist:", shaped); // Debugging line
-  
+    artist.subscriptionPlans = [
+      {
+        cycle,
+        price: subscriptionPrice,
+        stripePriceId,
+        razorpayPlanId,
+      },
+    ];
 
+    await artist.save();
+  }
+
+  const shaped = await shapeArtistResponse(artist.toObject());
   res.status(StatusCodes.CREATED).json({ success: true, artist: shaped });
 };
-}
-
-
 // ===================================================================
 // @desc    Update an existing artist by ID (Admin only)
 // @route   PATCH /api/artists/:id
