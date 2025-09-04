@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { StatusCodes } from 'http-status-codes';
 import { BadRequestError, UnauthorizedError, } from "../errors/index.js";
 import { shapeUserResponse } from "../dto/user.dto.js";
-
+import Session from "../models/Session.js";
 
 // ===================================================================
 // @desc    Register a new user
@@ -57,24 +57,34 @@ export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email }).select("+password");
-
-  if (!user) {
-    throw new BadRequestError("No user exists with this email");
-  }
+  if (!user) throw new BadRequestError("No user exists with this email");
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    throw new BadRequestError("Incorrect password");
+  if (!isMatch) throw new BadRequestError("Incorrect password");
+
+  // 🔒 Check active sessions
+  const activeSessions = await Session.find({ userId: user._id });
+  if (activeSessions.length >= 2) {
+    throw new BadRequestError("Maximum 2 active logins allowed");
   }
 
-  // ✅ Token is now captured and returned
+  // ✅ Generate token
   const token = generateToken(user._id, res);
+
+  // ✅ Save session
+  await Session.create({
+    userId: user._id,
+    token,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // example: 7d expiry
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+  });
 
   const shapedUser = shapeUserResponse(user.toObject());
 
   res.status(200).json({
     user: shapedUser,
-    token, // ✅ include token
+    token,
     message: "User logged in successfully",
   });
 };
@@ -132,6 +142,11 @@ export const logoutUser = async (req, res) => {
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production", // Use secure flag in production
   });
+  
+  
+  const token = req.cookies.token;
+  await Session.deleteOne({ token });
+
 
   res.status(StatusCodes.OK).json({
     message: "Logged Out Successfully",

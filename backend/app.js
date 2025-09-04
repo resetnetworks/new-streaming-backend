@@ -89,7 +89,7 @@ app.post(
 app.use(cookieParser());
 app.use(express.json());
 
-app.use(morgan("combined"));
+// app.use(morgan("combined"));
 app.use(xssClean());
 app.use(mongoSanitize());
 

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PayPal Test Checkout</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { margin: 10px 0; padding: 10px 15px; cursor: pointer; }
+    input { padding: 6px; margin: 5px 0; width: 300px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 5px; max-height: 400px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h2>PayPal Test Checkout</h2>
+
+  <!-- Create Order -->
+  <button id="create-order">Create Order</button>
+  <div id="order-id"></div>
+
+  <!-- Capture Order -->
+  <button id="capture-order" disabled>Capture Order</button>
+
+  <h3>Manual Capture (paste an Order ID)</h3>
+  <input type="text" id="manual-order-id" placeholder="Enter PayPal Order ID">
+  <button id="manual-capture">Capture Manually</button>
+
+  <h3>Response</h3>
+  <pre id="response"></pre>
+
+  <script>
+    const baseUrl = "http://localhost:4000"; // your backend base URL
+    let currentOrderId = null;
+
+    // Create order
+    document.getElementById("create-order").onclick = async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/payments/paypal/create-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemType: "song",
+            itemId: "68aed1cdb8349e471f406e0a", // dummy song ID
+            amount: 199,
+            currency: "USD"
+          })
+        });
+        const data = await res.json();
+        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+
+        if (data.success && data.id) {
+          currentOrderId = data.id;
+          document.getElementById("order-id").textContent = "Order ID: " + currentOrderId;
+          document.getElementById("capture-order").disabled = false;
+
+          // open approval link if exists
+          const approveLink = data.links.find(l => l.rel === "approve");
+          if (approveLink) {
+            window.open(approveLink.href, "_blank");
+          }
+        }
+      } catch (err) {
+        document.getElementById("response").textContent = err.message;
+      }
+    };
+
+    // Capture order
+    document.getElementById("capture-order").onclick = async () => {
+      if (!currentOrderId) return alert("No order created yet.");
+      try {
+        const res = await fetch(`${baseUrl}/api/payments/paypal/capture-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: currentOrderId })
+        });
+        const data = await res.json();
+        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("response").textContent = err.message;
+      }
+    };
+
+    // Manual capture by entering an order ID
+    document.getElementById("manual-capture").onclick = async () => {
+      const manualId = document.getElementById("manual-order-id").value.trim();
+      if (!manualId) return alert("Enter an order ID first.");
+      try {
+        const res = await fetch(`${baseUrl}/api/payments/paypal/capture-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: manualId })
+        });
+        const data = await res.json();
+        document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("response").textContent = err.message;
+      }
+    };
+  </script>
+</body>
+</html>

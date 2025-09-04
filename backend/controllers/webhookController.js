@@ -8,6 +8,7 @@ import Razorpay from "razorpay";
 import { log } from "console";
 import { User } from "../models/User.js";
 import { sendInvoiceEmail } from "../utils/email.js";
+import { razorpayWebhookService } from "../services/razorpayWebhook.js";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -158,9 +159,12 @@ await WebhookEventLog.create({
 // ---------------------------
 
 
+
+
+
 export const razorpayWebhook = async (req, res) => {
   console.log("📡 Razorpay webhook called");
-  
+
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     const signature = req.headers["x-razorpay-signature"];
@@ -170,7 +174,6 @@ export const razorpayWebhook = async (req, res) => {
       .createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
-   
 
     if (signature !== expectedSignature) {
       console.error("❌ Invalid Razorpay signature");
@@ -178,101 +181,19 @@ export const razorpayWebhook = async (req, res) => {
     }
 
     const eventData = JSON.parse(rawBody.toString());
-    const event = eventData.event;
-    console.log(`📥 Razorpay event received: ${eventData}`);
-    
+    const result = await razorpayWebhookService.handleEvent(eventData);
 
-    if (event === "payment.captured") {
-      const paymentEntity = eventData.payload.payment.entity;
-      const paymentId = paymentEntity.id;
-      const razorpayOrderId = paymentEntity.order_id;
-     
-      
-
-      // const fullPayment = await razorpay.payments.fetch(paymentId);
-      // const paymentEntity = eventData.payload.payment.entity;
-      const fullPayment = paymentEntity; 
-      let subscriptionId = null;
-     
-      
-
-      if (fullPayment.invoice_id) {
-        const invoice = await razorpay.invoices.fetch(fullPayment.invoice_id);
-        subscriptionId = invoice.subscription_id;
-      }
-
-      // 🔁 Subscription flow
-      if (subscriptionId) {
-        const transaction = await markTransactionPaid({
-          gateway: "razorpay",
-          paymentId,
-          subscriptionId,
-          razorpayOrderId,
-        });
-
-        if (transaction) {
-          await updateUserAfterPurchase(transaction, subscriptionId);
-          console.log("✅ Subscription activated/renewed");
-            if (fullPayment.invoice_id) {
-      const invoice = await razorpay.invoices.fetch(fullPayment.invoice_id);
-
-      // send invoice email
-      const user = await User.findById(transaction.userId);
-      if (user?.email) {
-        await sendInvoiceEmail("bilalforwin@gmail.com", invoice);
-        console.log("📧 Invoice email sent");
-      }
-    }
-        }
-
-        return res.status(200).json({ status: "subscription processed" });
-      }
-
-      // 💳 One-time payment flow
-      const { itemType: type, itemId, userId } = fullPayment.notes || {};
-
-      if (!type || !itemId || !userId) {
-        console.warn("⚠️ Missing metadata for one-time payment.");
-        return res.status(200).send("OK");
-      }
-
-      const transaction = await markTransactionPaid({
-        gateway: "razorpay",
-        paymentId,
-        userId,
-        itemId,
-        type,
-        razorpayOrderId,
-      });
-
-      if (transaction) {
-        await updateUserAfterPurchase(transaction, paymentId);
-      
-        console.log("✅ One-time purchase completed:", type, itemId);
-      }
-
-      return res.status(200).json({ status: "purchase processed" });
-    }
-
-    // 🔄 Recurring subscription charge (not used for logic, just logging)
-    if (event === "subscription.charged") {
-      console.log("🔄 Subscription charged:", eventData.payload.subscription.entity.id);
-    }
-
-    // ❌ Subscription ended
-    if (event === "subscription.halted" || event === "subscription.completed") {
-      await Subscription.findOneAndUpdate(
-        { externalSubscriptionId: eventData.payload.subscription.entity.id },
-        { status: "cancelled" }
-      );
-      console.log("❌ Subscription cancelled or completed.");
-    }
-
-    return res.status(200).json({ status: "ok" });
-
+    return res.status(200).json(result);
   } catch (err) {
     console.error("❌ Webhook processing failed:", err);
-    return res.status(500).json({ message: "Something went wrong, please try again later" });
+    return res
+      .status(500)
+      .json({ message: "Something went wrong, please try again later" });
   }
 };
+
+
+
+
+
 

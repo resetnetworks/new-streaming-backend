@@ -43,7 +43,7 @@ const subscriptionSchema = new mongoose.Schema(
     },
     gateway: {
       type: String,
-      enum: ["stripe", "razorpay"],
+      enum: ["stripe", "razorpay", "paypal"],
       required: true,
     },
     externalSubscriptionId: {

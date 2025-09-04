@@ -1,5 +1,8 @@
+
 // src/utils/axiosInstance.js
 import axios from "axios";
+
+
 
 // ✅ Create axios instance
 const axiosInstance = axios.create({
@@ -7,6 +10,7 @@ const axiosInstance = axios.create({
   withCredentials: true, // ✅ Send cookies (needed for cookie-based auth)
   timeout: 300000,
 });
+
 
 // ✅ Helper function to get token from cookie
 const getTokenFromCookie = () => {
@@ -21,7 +25,50 @@ const getTokenFromCookie = () => {
   return null;
 };
 
-// ✅ Attach token on each request
+
+// ✅ NEW: Helper function to clear all cookies
+const clearAllCookies = () => {
+  if (typeof document === 'undefined') return;
+  
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const eqPos = cookie.indexOf('=');
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+  }
+};
+
+
+// ✅ NEW: Comprehensive auth data clearing function
+const clearAllAuthData = () => {
+  // Clear localStorage
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  localStorage.removeItem("subscribedArtists");
+  
+  // ✅ Clear Redux Persist data
+  localStorage.removeItem("persist:root");
+  localStorage.removeItem("persist:auth");
+  localStorage.removeItem("persist:player");
+  
+  // Clear all persist keys
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('persist:')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Clear all cookies
+  clearAllCookies();
+  
+  // ✅ Remove Authorization header from axios defaults
+  delete axiosInstance.defaults.headers.common["Authorization"];
+  
+};
+
+
+// ✅ ENHANCED: Attach token on each request with Authorization header
 axiosInstance.interceptors.request.use(
   (config) => {
     // Try localStorage first, then cookie
@@ -35,38 +82,79 @@ axiosInstance.interceptors.request.use(
       }
     }
 
+
+    // ✅ NEW: Set Authorization header if token exists
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ✅ Global response error handling
+
+// ✅ ENHANCED: Global response error handling with comprehensive token expiry detection
 axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
+    console.error("Axios interceptor caught error:", error);
     
-    if (error.response?.status === 401) {
-      console.warn("🚫 Unauthorized — clearing auth data");
+    const errorStatus = error.response?.status;
+    const errorMessage = error.response?.data?.message || error.message;
+    
+    // ✅ ENHANCED: Comprehensive token expiry detection
+    const isTokenExpired = (
+      errorStatus === 401 ||          // Unauthorized
+       // Server error (database issues)
+      error.code === 'ECONNREFUSED' ||  // Database connection refused
+      error.code === 'ENOTFOUND' ||     // Database not found
+      error.message?.includes('Network Error') ||
+      errorMessage?.toLowerCase().includes('token') ||
+      errorMessage?.toLowerCase().includes('authentication') ||
+      errorMessage?.toLowerCase().includes('unauthorized') ||
+      errorMessage === "Authentication token missing. Please login." ||
+      errorMessage?.includes('User not found') ||
+      errorMessage?.includes('Authentication failed')
+    );
+    
+    if (isTokenExpired) {
+      console.warn("🚫 Token expired or invalid — clearing all auth data");
       
-      // Clear auth data
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      // ✅ Clear all auth data immediately
+      clearAllAuthData();
       
-      // Don't redirect if already on auth pages
+      // ✅ Dispatch logout action to Redux if available
+      if (window.store) {
+        window.store.dispatch({ type: 'auth/logout/fulfilled' });
+      }
+      
+      // ✅ Smart redirect to avoid loops
       const currentPath = window.location.pathname;
-      const authPaths = ['/login', '/register', '/forgot-password'];
+      const authPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/auth/callback'];
+      const publicPaths = ['/privacy-policy', '/help', '/data-deletion'];
       const isOnAuthPage = authPaths.some(path => currentPath.includes(path));
+      const isOnPublicPage = publicPaths.some(path => currentPath.includes(path));
       
-      if (!isOnAuthPage) {
+      // Only redirect if not already on auth page and not on public pages
+      if (!isOnAuthPage && !isOnPublicPage) {
+        
+        // Clear URL and redirect to login
+        window.history.replaceState(null, '', '/login');
         window.location.href = '/login';
       }
+    }
+    else if (errorStatus === 400) {
+      // ✅ Keep your existing 400 error handling
+      error.message = "User already exists. Please try logging in.";
     }
     
     return Promise.reject(error);
   }
 );
 
+
 export default axiosInstance;
+

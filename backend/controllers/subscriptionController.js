@@ -283,3 +283,44 @@ export const createRazorpaySubscription = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+export const createPaypalSubscription = async (req, res) => {
+  const { artistId } = req.params;
+  const { cycle } = req.body;
+  const user = req.user;
+
+  const artist = await Artist.findById(artistId).select("subscriptionPlans name");
+  if (!artist) throw new NotFoundError("Artist not found");
+
+  const plan = artist.subscriptionPlans.find((p) => p.cycle === cycle);
+  if (!plan) throw new NotFoundError(`No plan for cycle ${cycle}`);
+
+  // ✅ Create Subscription
+  const request = new paypal.subscriptions.SubscriptionsCreateRequest();
+  request.requestBody({
+    plan_id: plan.paypalPlanId,  // must be pre-created and stored
+    application_context: {
+      brand_name: artist.name,
+      user_action: "SUBSCRIBE_NOW",
+      return_url: `${process.env.FRONTEND_URL}/paypal/sub-success`,
+      cancel_url: `${process.env.FRONTEND_URL}/paypal/sub-cancel`,
+    },
+  });
+
+  const subscription = await paypalClient().execute(request);
+
+  await Transaction.create({
+    userId: user._id,
+    itemType: "artist-subscription",
+    itemId: artistId,
+    artistId,
+    amount: plan.price,
+    currency: "USD",
+    gateway: "paypal",
+    status: "pending",
+    metadata: { paypalSubscriptionId: subscription.result.id, cycle },
+  });
+
+  res.json({ success: true, subscriptionId: subscription.result.id, approveUrl: subscription.result.links });
+};
