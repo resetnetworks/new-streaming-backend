@@ -49,7 +49,7 @@ const [shapedArtists, shapedSongs, shapedAlbums] = await Promise.all([
 ]);
 
   
-  console.log(shapedArtists, shapedSongs, shapedAlbums);
+ 
   
 
   res.status(StatusCodes.OK).json({

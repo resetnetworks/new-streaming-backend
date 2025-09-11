@@ -18,7 +18,8 @@ export const markTransactionPaid = async ({
 }) => {
   let query = {};
   console.log("🔍 Marking transaction as paid:")
-
+console.log({ gateway, paymentId, razorpayOrderId, paymentIntentId, stripeSubscriptionId, subscriptionId });
+console.log("Searching with query:", query);
   if (!gateway) {
     console.warn("⚠️ No payment gateway provided. Cannot mark transaction as paid.");
     return null;
@@ -29,13 +30,20 @@ export const markTransactionPaid = async ({
     } else {
       query = { paymentIntentId };
     }
-  } else if (gateway === "razorpay") {
+  } else if(gateway === "razorpay") {
     if (subscriptionId) {
       query = { "metadata.razorpaySubscriptionId": subscriptionId };
     } else if (razorpayOrderId) {
       query = { razorpayOrderId };
     } else if (paymentId) {
       query = { paymentId }; 
+    }
+  }
+  else if (gateway === "paypal") {
+    if (subscriptionId) {
+      query = { "metadata.paypalSubscriptionId": subscriptionId };
+    } else if (paymentId) {
+      query = { paymentId };
     }
   }
 

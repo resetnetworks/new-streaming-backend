@@ -26,6 +26,12 @@ const subscriptionPlanSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    paypalPlans: [
+      {
+        currency: { type: String, required: true },
+        paypalPlanId: { type: String, required: true }
+      }
+    ]
   },
   { _id: false } // prevent extra _id for subdocs
 );

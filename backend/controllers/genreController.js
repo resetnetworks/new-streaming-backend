@@ -11,7 +11,7 @@ import { isAdmin } from "../utils/authHelper.js";
 // @access  Admin
 // ===================================================================
 export const createGenre = async (req, res) => {
-  console.log(isAdmin(req.user));
+  
   
   // Authorization check
   if (!isAdmin(req.user)) {
@@ -52,7 +52,7 @@ export const createGenre = async (req, res) => {
 // @access  Public
 // ===================================================================
 export const getGenres = async (req, res) => {
-  console.log(req.user);
+
   
 
     // Extract and validate query parameters

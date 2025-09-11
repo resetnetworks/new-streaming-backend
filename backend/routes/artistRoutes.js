@@ -1,15 +1,7 @@
 import express from "express";
 import { authenticateUser } from "../middleware/authenticate.js";
 import { isAdmin } from "../middleware/isAdmin.js";
-
-import {
-  createArtist,
-  updateArtist,
-  deleteArtist,
-  getAllArtists,
-  getArtistById,
-  getAllArtistsWithoutPagination,
-} from "../controllers/artistController.js";
+import { createArtist, updateArtist , getAllArtists, getArtistById, deleteArtist} from "../controllers/artistController2.js";
 import { singleImageUpload } from "../middleware/uploadMiddleware.js";
 import {
   createArtistValidator,
@@ -56,7 +48,7 @@ router.delete(
 router.get("/", authenticateUser, getAllArtists);
 
 // Get all artists (no pagination)
-router.get("/all", authenticateUser, getAllArtistsWithoutPagination);
+// router.get("/all", authenticateUser, getAllArtistsWithoutPagination);
 
 // Get artist by ID
 router.get("/:id", authenticateUser, getArtistById);

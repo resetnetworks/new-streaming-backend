@@ -1,8 +1,7 @@
 import express from "express";
 import { authenticateUser } from "../middleware/authenticate.js";
+import {createSong, updateSong} from "../controllers/songController2.js";
 import {
-  createSong,
-  updateSong,
   deleteSong,
   getAllSongs,
   getSongById,

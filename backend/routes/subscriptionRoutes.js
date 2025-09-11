@@ -5,6 +5,7 @@ import { artistIdValidator } from "../validators/artistValidators.js";
 import validate from "../middleware/validate.js";
 import { createSetupIntent } from "../controllers/subscriptionController.js";
 import { createRazorpaySubscription } from "../controllers/subscriptionController.js";
+import {createPaypalSubscription} from "../controllers/subscriptionController.js";
 
 const router = express.Router();
 
@@ -18,6 +19,8 @@ router.post("/setup-intent", authenticateUser, createSetupIntent);
 
 // routes/userRoutes.js
 router.delete("/artist/:artistId", authenticateUser, cancelArtistSubscription);
+
+router.post("/paypal/artist/:artistId", authenticateUser, createPaypalSubscription);
 
 
 export default router;

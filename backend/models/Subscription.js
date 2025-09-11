@@ -47,7 +47,7 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
     },
     externalSubscriptionId: {
-      type: String, // Stripe subscription ID or Razorpay subscription ID
+      type: String, // Stripe subscription ID or Razorpay subscription 
       required: true,
       index: true,
     },

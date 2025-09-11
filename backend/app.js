@@ -37,7 +37,7 @@ import { razorpayWebhook } from './controllers/webhookController.js';
 import passport from "./middleware/passport.js";
 import notFoundMiddleware from "./middleware/not-found.js";
 import errorHandlerMiddleware from "./middleware/errorhandler.js";
-
+import { paypalWebhook } from './controllers/webhookController.js';
 // import { registerPaymentEventHandlers } from "./payment/events/paymentEventHandlers.js";
 // import { registerPaymentSubscribers } from "./features/payment/subscribers/index.js";
 //    registerPaymentSubscribers();
@@ -85,6 +85,11 @@ app.post(
   "/api/webhooks/razorpay",
   express.raw({ type: "application/json" }), // ✅ this is what Razorpay needs
   razorpayWebhook
+);
+app.post(
+  "/api/webhooks/paypal",
+  express.raw({ type: "application/json" }), // ✅ this is what Razorpay needs
+  paypalWebhook
 );
 app.use(cookieParser());
 app.use(express.json());

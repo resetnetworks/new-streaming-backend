@@ -10,6 +10,10 @@ import {User} from "../models/User.js";
 import Razorpay from "razorpay";
 import { createRazorpayPlan } from "../utils/razorpay.js";
 import { razorpay } from "../utils/razorpay.js";
+import {getPayPalAccessToken} from "../utils/getPaypalAccessToken.js";
+import paypal from "@paypal/checkout-server-sdk";
+import  {paypalClient}  from "../utils/paypalClient.js";
+import { PAYPAL_API} from "../utils/getPaypalAccessToken.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export const initiateArtistSubscription = async (req, res) => {
@@ -287,7 +291,7 @@ export const createRazorpaySubscription = async (req, res) => {
 
 export const createPaypalSubscription = async (req, res) => {
   const { artistId } = req.params;
-  const { cycle } = req.body;
+  const { cycle, currency = "USD" } = req.body;
   const user = req.user;
 
   const artist = await Artist.findById(artistId).select("subscriptionPlans name");
@@ -296,31 +300,56 @@ export const createPaypalSubscription = async (req, res) => {
   const plan = artist.subscriptionPlans.find((p) => p.cycle === cycle);
   if (!plan) throw new NotFoundError(`No plan for cycle ${cycle}`);
 
-  // ✅ Create Subscription
-  const request = new paypal.subscriptions.SubscriptionsCreateRequest();
-  request.requestBody({
-    plan_id: plan.paypalPlanId,  // must be pre-created and stored
-    application_context: {
-      brand_name: artist.name,
-      user_action: "SUBSCRIBE_NOW",
-      return_url: `${process.env.FRONTEND_URL}/paypal/sub-success`,
-      cancel_url: `${process.env.FRONTEND_URL}/paypal/sub-cancel`,
+  // ✅ pick correct PayPal plan for currency
+  const paypalPlan = plan.paypalPlans?.find((pp) => pp.currency === currency);
+  if (!paypalPlan) throw new BadRequestError(`No PayPal plan for ${currency}`);
+
+  // ✅ Use REST API instead of SDK
+  const token = await getPayPalAccessToken();
+  const response = await fetch(`${PAYPAL_API}/v1/billing/subscriptions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      plan_id: paypalPlan.paypalPlanId,
+      application_context: {
+        brand_name: artist.name,
+        user_action: "SUBSCRIBE_NOW",
+        return_url: `${process.env.FRONTEND_URL}/paypal/sub-success`,
+        cancel_url: `${process.env.FRONTEND_URL}/paypal/sub-cancel`,
+      },
+    }),
   });
 
-  const subscription = await paypalClient().execute(request);
+  const subscription = await response.json();
+  if (!response.ok) {
+    throw new Error(`PayPal subscription creation failed: ${JSON.stringify(subscription)}`);
+  }
 
+  const approveLink = subscription.links.find((l) => l.rel === "approve")?.href;
+
+  // ✅ Save transaction in DB
   await Transaction.create({
     userId: user._id,
     itemType: "artist-subscription",
     itemId: artistId,
     artistId,
     amount: plan.price,
-    currency: "USD",
+    currency,
     gateway: "paypal",
     status: "pending",
-    metadata: { paypalSubscriptionId: subscription.result.id, cycle },
+    metadata: {
+      paypalSubscriptionId: subscription.id,
+      cycle,
+      paypalPlanId: paypalPlan.paypalPlanId,
+    },
   });
 
-  res.json({ success: true, subscriptionId: subscription.result.id, approveUrl: subscription.result.links });
+  res.json({
+    success: true,
+    subscriptionId: subscription.id,
+    approveUrl: approveLink,
+  });
 };

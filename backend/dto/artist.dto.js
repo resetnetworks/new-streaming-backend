@@ -1,19 +1,19 @@
 import { Song } from "../models/Song.js";
 import { Album } from "../models/Album.js";
 
-export const shapeArtistResponse = async (artist) => {
-  const [songCount, albumCount] = await Promise.all([
-    Song.countDocuments({ artist: artist._id }),
-    Album.countDocuments({ artist: artist._id }),
-  ]);
-
-  // Normalize subscriptionPlans to only the fields the frontend needs
+export const shapeArtistResponse = (artist) => {
   const plans = Array.isArray(artist.subscriptionPlans)
     ? artist.subscriptionPlans.map((p) => ({
-        cycle: p.cycle,                 // "1m" | "3m" | "6m" | "12m"
-        price: p.price,                 // number
-        razorpayPlanId: p.razorpayPlanId, // "plan_..."
-        stripePriceId: p.stripePriceId,   // "price_..."
+        cycle: p.cycle,
+        price: p.price,
+        razorpayPlanId: p.razorpayPlanId,
+        stripePriceId: p.stripePriceId,
+        paypalPlans: Array.isArray(p.paypalPlans)
+          ? p.paypalPlans.map((pp) => ({
+              currency: pp.currency,
+              paypalPlanId: pp.paypalPlanId,
+            }))
+          : [],
       }))
     : [];
 
@@ -24,12 +24,10 @@ export const shapeArtistResponse = async (artist) => {
     image: artist.image,
     location: artist.location,
     bio: artist.bio,
-    subscriptionPrice: artist.subscriptionPrice,
-    subscriptionPlans: plans, // expose cycles + plan IDs
-    songCount,
-    albumCount,
+    subscriptionPlans: plans,
+    songCount: artist.songCount ?? 0,   // use precomputed counts if available
+    albumCount: artist.albumCount ?? 0,
     createdAt: artist.createdAt,
     updatedAt: artist.updatedAt,
   };
 };
-

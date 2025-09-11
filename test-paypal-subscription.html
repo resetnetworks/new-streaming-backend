@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PayPal Subscription Test</title>
+</head>
+<body>
+  <h2>Test PayPal Subscription</h2>
+
+  <label>Cycle (plan cycle):</label>
+  <select id="cycle">
+    <option value="1m">1 Month</option>
+    <option value="3m">3 Months</option>
+    <option value="6m">6 Months</option>
+  </select>
+  <br><br>
+
+  <label>Currency:</label>
+  <select id="currency">
+    <option value="USD">USD</option>
+    <option value="EUR">EUR</option>
+    <option value="INR">INR</option>
+  </select>
+  <br><br>
+
+  <button id="createBtn">Create Subscription</button>
+  <button id="clearBtn">Clear</button>
+
+  <pre id="output">No request made yet.</pre>
+
+  <script>
+    const artistId = "68bbdd47e972af4505cd4efc"; // replace with actual artistId
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4YmJmNzI0ZDIxM2RkZTg1NzllNzA4MSIsImlhdCI6MTc1NzMxNzQ5MCwiZXhwIjoxNzU4NjEzNDkwfQ.2u7h81jnwolLZS6UGyulnW6cnAS0VnIWpfOCmPXJ2Mc"; // replace with logged-in user's JWT token
+
+    const $ = {
+      createBtn: document.getElementById("createBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      output: document.getElementById("output"),
+      cycle: document.getElementById("cycle"),
+      currency: document.getElementById("currency")
+    };
+
+    async function createSubscription() {
+      $.output.textContent = "Creating subscription...";
+      try {
+     const res = await fetch(`http://localhost:4000/api/subscriptions/paypal/artist/${artistId}`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    cycle: $.cycle.value,
+    currency: $.currency.value
+  })
+});
+          
+
+        const data = await res.json();
+        $.output.textContent = JSON.stringify(data, null, 2);
+
+        if (data.approveUrl) {
+          window.open(data.approveUrl, "_blank");
+        }
+      } catch (err) {
+        $.output.textContent = "Error: " + err.message;
+      }
+    }
+
+    $.createBtn.addEventListener("click", createSubscription);
+    $.clearBtn.addEventListener("click", () => {
+      $.output.textContent = "No request made yet.";
+    });
+  </script>
+</body>
+</html>

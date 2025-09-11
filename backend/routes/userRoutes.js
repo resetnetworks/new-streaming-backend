@@ -13,8 +13,7 @@ import {
   forgotPassword,
   resetPassword,
   googleAuthCallback,
-  facebookAuthCallback,
-  appleCallback,
+
 } from "../controllers/userControllers.js";
 
 import {
@@ -71,23 +70,6 @@ router.get(
   googleAuthCallback
 );
 
-// 🌐 Facebook OAuth
-router.get(
-  "/facebook",
-  passport.authenticate("facebook", { scope: ["email"] })
-);
-router.get(
-  "/facebook/callback",
-  passport.authenticate("facebook", { session: false, failureRedirect: "/login" }),
-  facebookAuthCallback
-);
 
-// 🍎 Apple OAuth
-router.get("/apple", passport.authenticate("apple"));
-router.post(
-  "/apple/callback",
-  passport.authenticate("apple", { session: false, failureRedirect: "/login" }),
-  appleCallback
-);
 
 export default router;

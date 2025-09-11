@@ -11,17 +11,34 @@ import { shapeArtistResponse } from "../dto/artist.dto.js";
 import { log } from "console";
 import { createArtistStripeSubscriptionPrice } from "../utils/stripe.js";
 import { createRazorpayPlan } from "../utils/razorpay.js";
+import { createPayPalProduct, createPayPalPlan } from "../utils/getPaypalAccessToken.js";
 
 const cycleToInterval = (cycle) => {
   switch (cycle) {
     case "1m":
-      return { stripe: { interval: "month", interval_count: 1 }, razorpay: { period: "monthly", interval: 1 } };
+      return {
+        stripe: { interval: "month", interval_count: 1 },
+        razorpay: { period: "monthly", interval: 1 },
+        paypal: { interval_unit: "MONTH", interval_count: 1 },
+      };
     case "3m":
-      return { stripe: { interval: "month", interval_count: 3 }, razorpay: { period: "monthly", interval: 3 } };
+      return {
+        stripe: { interval: "month", interval_count: 3 },
+        razorpay: { period: "monthly", interval: 3 },
+        paypal: { interval_unit: "MONTH", interval_count: 3 },
+      };
     case "6m":
-      return { stripe: { interval: "month", interval_count: 6 }, razorpay: { period: "monthly", interval: 6 } };
+      return {
+        stripe: { interval: "month", interval_count: 6 },
+        razorpay: { period: "monthly", interval: 6 },
+        paypal: { interval_unit: "MONTH", interval_count: 6 },
+      };
     case "12m":
-      return { stripe: { interval: "year", interval_count: 1 }, razorpay: { period: "yearly", interval: 1 } };
+      return {
+        stripe: { interval: "year", interval_count: 1 },
+        razorpay: { period: "yearly", interval: 1 },
+        paypal: { interval_unit: "YEAR", interval_count: 1 },
+      };
     default:
       throw new BadRequestError("Invalid subscription cycle. Use 1m, 3m, 6m, or 12m.");
   }
@@ -43,7 +60,7 @@ export const createArtist = async (req, res) => {
   if (!name) throw new BadRequestError("Artist name is required.");
   if (!cycle) throw new BadRequestError("Subscription cycle is required (1m, 3m, 6m, 12m).");
 
-  const { stripe, razorpay } = cycleToInterval(cycle);
+  const { stripe, razorpay, paypal } = cycleToInterval(cycle);
 
   const imageFile = req.files?.coverImage?.[0];
   const imageUrl = imageFile?.location || "";
@@ -57,7 +74,7 @@ export const createArtist = async (req, res) => {
   });
 
   if (subscriptionPrice && subscriptionPrice > 0) {
-    // Stripe subscription price
+    // ✅ Stripe subscription price
     const stripePriceId = await createArtistStripeSubscriptionPrice(
       artist.name,
       subscriptionPrice,
@@ -65,22 +82,40 @@ export const createArtist = async (req, res) => {
       stripe.interval_count
     );
 
-    // Razorpay plan
+    // ✅ Razorpay plan
     const razorpayPlanId = await createRazorpayPlan(
       artist.name,
       subscriptionPrice,
       razorpay.interval,
-      razorpay.period,
+      razorpay.period
     );
+    // ✅ Create PayPal product once per artist
+const paypalProductId = await createPayPalProduct(artist.name);
+    // ✅ PayPal multi-currency plans
+    const supportedCurrencies = ["USD",  "EUR"];
+    const paypalPlans = [];
 
+   for (const currency of supportedCurrencies) {
+  const paypalPlanId = await createPayPalPlan({
+    productId: paypalProductId,                     // <-- FIXED
+    price: subscriptionPrice,
+    intervalUnit: paypal.interval_unit,             // <-- FIXED
+    intervalCount: paypal.interval_count,           // <-- FIXED
+    currency,
+  });
+  paypalPlans.push({ currency, paypalPlanId });
+}
+console.log("Created PayPal plans:", paypalPlans);
     artist.subscriptionPlans = [
       {
         cycle,
         price: subscriptionPrice,
         stripePriceId,
         razorpayPlanId,
+        paypalPlans:paypalPlans, // ✅ array of { currency, paypalPlanId }
       },
     ];
+    console.log("Created subscription plans:", artist.subscriptionPlans);
 
     await artist.save();
   }
@@ -141,29 +176,43 @@ export const updateArtist = async (req, res) => {
 // @access  Admin
 // ===================================================================
 export const deleteArtist = async (req, res) => {
-  // Authorization check
   if (!isAdmin(req.user)) {
-    throw new UnauthorizedError('Access denied. Admins only.');
+    throw new UnauthorizedError("Access denied. Admins only.");
   }
 
   const { id } = req.params;
 
-  // Validate MongoDB ObjectId
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new BadRequestError('Invalid artist ID.');
+    throw new BadRequestError("Invalid artist ID.");
   }
 
-  // Attempt to find the artist
-  const artist = await Artist.findById(id);
+  // Hard delete (if you want cascade cleanup)
+  const artist = await Artist.findByIdAndDelete(id);
   if (!artist) {
-    throw new NotFoundError('Artist not found.');
+    throw new NotFoundError("Artist not found.");
   }
 
-  // Perform deletion
-  await artist.deleteOne();
+  // TODO: Optional cascade cleanup
+  // await Song.deleteMany({ artist: id });
+  // await Album.deleteMany({ artist: id });
+  // await Subscription.deleteMany({ artist: id });
+  // await Transaction.updateMany({ artist: id }, { status: "cancelled" });
 
-  res.status(StatusCodes.OK).json({ success: true, message: 'Artist deleted successfully' });
+  // TODO: Audit log (recommended for destructive ops)
+  // await AuditLog.create({
+  //   action: "delete_artist",
+  //   actor: req.user._id,
+  //   artistId: id,
+  //   timestamp: new Date(),
+  // });
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Artist deleted successfully",
+    artistId: id,
+  });
 };
+
 
 
 // ===================================================================
@@ -218,29 +267,29 @@ export const getAllArtists = async (req, res) => {
 // @route   GET /api/artists/all
 // @access  Public or Admin (based on need)
 // ===================================================================
-export const getAllArtistsWithoutPagination = async (req, res) => {
-  const artists = await Artist.find().sort({ createdAt: -1 }).lean();
+// export const getAllArtistsWithoutPagination = async (req, res) => {
+//   const artists = await Artist.find().sort({ createdAt: -1 }).lean();
 
-  const enrichedArtists = await Promise.all(
-    artists.map(async (artist) => {
-      const [songCount, albumCount] = await Promise.all([
-        Song.countDocuments({ artist: artist._id }),
-        Album.countDocuments({ artist: artist._id }),
-      ]);
+//   const enrichedArtists = await Promise.all(
+//     artists.map(async (artist) => {
+//       const [songCount, albumCount] = await Promise.all([
+//         Song.countDocuments({ artist: artist._id }),
+//         Album.countDocuments({ artist: artist._id }),
+//       ]);
 
-      return shapeArtistResponse({
-        ...artist,
-        songCount,
-        albumCount,
-      });
-    })
-  );
+//       return shapeArtistResponse({
+//         ...artist,
+//         songCount,
+//         albumCount,
+//       });
+//     })
+//   );
 
-  res.status(StatusCodes.OK).json({
-    success: true,
-    artists: enrichedArtists,
-  });
-};
+//   res.status(StatusCodes.OK).json({
+//     success: true,
+//     artists: enrichedArtists,
+//   });
+// };
 
 
 

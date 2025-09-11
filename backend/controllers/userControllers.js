@@ -154,34 +154,6 @@ export const logoutUser = async (req, res) => {
 };
 
 
-// New: Like/Unlike song controller matching likedsong array
-// export const likeSong = TryCatch(async (req, res) => {
-//   const user = await User.findById(req.user._id);
-
-//   if (!user) {
-//     return res.status(404).json({ message: "User not found" });
-//   }
-
-//   const songId = req.params.id;
-
-//   if (user.likedsong.includes(songId)) {
-//     user.likedsong = user.likedsong.filter(id => id !== songId);
-
-//     await user.save();
-
-//     return res.json({
-//       message: "Song removed from liked songs",
-//     });
-//   }
-
-//   user.likedsong.push(songId);
-
-//   await user.save();
-
-//   return res.json({
-//     message: "Song added to liked songs",
-//   });
-// });
 
 
 
@@ -344,71 +316,8 @@ export const googleAuthCallback = (req, res) => {
   }
 };
 
-// ===================================================================
-// @desc    Handle Facebook OAuth callback and redirect to client
-// @route   GET /api/auth/facebook/callback
-// @access  Public (OAuth)
-// ===================================================================
-export const facebookAuthCallback = (req, res) => {
-  try {
-    // 🔥 NEW: Extract user and isNewUser from req.user
-    const { user, isNewUser } = req.user || {};
-    
-    if (!user) {
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=facebook_auth_failed`);
-    }
 
-    
-    // 🔥 NEW: Use same generateToken pattern as login/register
-    const token = generateToken(user._id, res);
-    
-    
-    // 🔥 NEW: Redirect to frontend callback with newUser parameter
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?newUser=${isNewUser}`;
-    
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    res.redirect(`${process.env.CLIENT_URL}/login?error=callback_failed`);
-  }
-};
 
-// ===================================================================
-// @desc    Handle Apple OAuth callback and respond with token & user
-// @route   GET /api/auth/apple/callback
-// @access  Public (OAuth)
-// ===================================================================
-export const appleCallback = (req, res) => {
-  try {
-    // 🔥 NEW: Extract user and isNewUser from req.user
-    const { user, isNewUser } = req.user || {};
-    
-    if (!user) {
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=apple_auth_failed`);
-    }
-
-   
-    
-    // 🔥 NEW: Use same generateToken pattern as login/register
-    const token = generateToken(user._id, res);
-    
-    
-    // 🔥 NEW: Redirect to frontend callback with newUser parameter
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?newUser=${isNewUser}`;
-    
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    res.redirect(`${process.env.CLIENT_URL}/login?error=callback_failed`);
-  }
-};
-
-// 🆕 NEW: Get user profile endpoint for social login (used by frontend)
-// ===================================================================
-// @desc    Get current user's profile (enhanced for social login)
-// @route   GET /api/users/me
-// @access  Private
-// ===================================================================
 
 
 

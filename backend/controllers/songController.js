@@ -72,7 +72,7 @@ export const createSong = async (req, res) => {
 
   const audioUrl = req.files.audio[0].location;
   const coverImageUrl = req.files?.coverImage?.[0]?.location || albumImage?.coverImage || "";
-  console.log("Audio URL:", coverImageUrl);
+ 
 
   const audioKey = audioUrl.split("/").pop().replace(/\.[^/.]+$/, "");
 
@@ -313,7 +313,7 @@ export const getAllSongs = async (req, res) => {
 // ===================================================================
 export const getSongById = async (req, res) => {
   const { id } = req.params;
-  console.log("hello");
+  
   
 
   // Validate ID type
@@ -333,7 +333,7 @@ export const getSongById = async (req, res) => {
 
   const shaped = shapeSongResponse(song, hasAccess);
 
-   console.log(song);
+  
    
   res.status(StatusCodes.OK).json({ success: true, song: shaped });
 };
@@ -422,9 +422,12 @@ export const getSongsMatchingUserGenres = async (req, res) => {
 // ===================================================================
 export const getSongsByGenre = async (req, res) => {
   const user = req.user;
+  const { genre } = req.params;
+  console.log("Genre Param:", genre);
 
   // 1. Extract and validate query parameters
-  const { genre, page = 1, limit = 20 } = req.query;
+  const {  page = 1, limit = 20 } = req.query;
+  console.log("Requested Genre:", genre);
 
   const currentPage = Math.max(1, parseInt(page, 10));
   const pageLimit = Math.min(50, Math.max(1, parseInt(limit, 10)));
@@ -434,6 +437,7 @@ export const getSongsByGenre = async (req, res) => {
   const query = genre
     ? { genre: { $regex: new RegExp(genre, "i") } }
     : {};
+    console.log("Genre Query:", query);
 
   // 3. Fetch paginated songs and count
   const [songs, total] = await Promise.all([
