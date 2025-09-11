@@ -186,6 +186,7 @@ export const razorpayWebhook = async (req, res) => {
 
     const eventData = JSON.parse(rawBody.toString());
     const event = eventData.event;
+    console.log(`📥 Razorpay event received: ${event}`);
 
     if (event === "payment.captured") {
       const paymentEntity = eventData.payload.payment.entity;
