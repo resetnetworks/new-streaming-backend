@@ -261,7 +261,8 @@ export const getAllSongs = async (req, res) => {
   const type = req.query.type || "all";
   const artistId = req.query.artistId || null;
 
-  let query = {};
+  // Base query - only songs with null album (single songs)
+  let query = { album: null };
   let sortOption = { createdAt: -1 };
 
   switch (type) {
@@ -274,6 +275,7 @@ export const getAllSongs = async (req, res) => {
     case "similar":
       if (!artistId) throw new BadRequestError("artistId is required for similar songs");
       query.artist = artistId;
+      // album: null condition already included in base query
       break;
   }
 
@@ -284,7 +286,7 @@ export const getAllSongs = async (req, res) => {
     .skip(skip)
     .limit(limit)
     .populate("artist", "name image slug")
-    .populate("album", "title coverImage")
+    .populate("album", "title coverImage") // This won't populate anything since album is null
     .lean();
 
   const shapedSongs = await Promise.all(
@@ -303,6 +305,7 @@ export const getAllSongs = async (req, res) => {
     songs: shapedSongs,
   });
 };
+
 
 
 
