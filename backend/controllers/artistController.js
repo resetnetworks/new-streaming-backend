@@ -267,29 +267,29 @@ export const getAllArtists = async (req, res) => {
 // @route   GET /api/artists/all
 // @access  Public or Admin (based on need)
 // ===================================================================
-// export const getAllArtistsWithoutPagination = async (req, res) => {
-//   const artists = await Artist.find().sort({ createdAt: -1 }).lean();
+export const getAllArtistsWithoutPagination = async (req, res) => {
+  const artists = await Artist.find().sort({ createdAt: -1 }).lean();
 
-//   const enrichedArtists = await Promise.all(
-//     artists.map(async (artist) => {
-//       const [songCount, albumCount] = await Promise.all([
-//         Song.countDocuments({ artist: artist._id }),
-//         Album.countDocuments({ artist: artist._id }),
-//       ]);
+  const enrichedArtists = await Promise.all(
+    artists.map(async (artist) => {
+      const [songCount, albumCount] = await Promise.all([
+        Song.countDocuments({ artist: artist._id }),
+        Album.countDocuments({ artist: artist._id }),
+      ]);
 
-//       return shapeArtistResponse({
-//         ...artist,
-//         songCount,
-//         albumCount,
-//       });
-//     })
-//   );
+      return shapeArtistResponse({
+        ...artist,
+        songCount,
+        albumCount,
+      });
+    })
+  );
 
-//   res.status(StatusCodes.OK).json({
-//     success: true,
-//     artists: enrichedArtists,
-//   });
-// };
+  res.status(StatusCodes.OK).json({
+    success: true,
+    artists: enrichedArtists,
+  });
+};
 
 
 
