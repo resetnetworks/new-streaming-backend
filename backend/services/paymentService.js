@@ -43,12 +43,13 @@ console.log("Searching with query:", query);
     if (subscriptionId) {
       query = { "metadata.paypalSubscriptionId": subscriptionId };
     } else if (paymentId) {
-      query = { paymentId };
+      query = { paypalOrderId:paymentId };
     }
   }
-
+console.log("Final query for transaction:", query);
 
   const transaction = await Transaction.findOne(query);
+  console.log("Found transaction:", transaction);
   if (!transaction || transaction.status === "paid") {
     console.warn("⚠️ Transaction not found or already marked as paid");
     

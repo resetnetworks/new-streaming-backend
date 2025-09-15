@@ -4,19 +4,23 @@ import { createSubscriptionPlans, updateSubscriptionPlans} from "./planService.j
 import mongoose from "mongoose";
 import {Song} from "../models/Song.js";
 import { Album } from "../models/Album.js";
+import { convertCurrencies } from "../utils/convertCurrencies.js";
 
 export const createArtistService = async ({ name, bio, location, imageUrl, subscriptionPrice, cycle, createdBy }) => {
   // Initialize artist object but do not save yet
   const artist = new Artist({ name, bio, location, image: imageUrl, subscriptionPlans: [], createdBy });
-
+  const basePrice = { currency: "USD", amount: 10 }; // default base price
+  subscriptionPrice = subscriptionPrice || 0;
   // If subscription exists, create plans
   if (subscriptionPrice && subscriptionPrice > 0) {
     const intervals = cycle; // cycleToInterval already called in controller
-    const plans = await createSubscriptionPlans(name, subscriptionPrice, intervals);
+      const convertedPrices = await convertCurrencies(basePrice.currency, basePrice.amount);
+    console.log("Converted Prices:", convertedPrices);
+    const plans = await createSubscriptionPlans(name, basePrice, cycle, convertedPrices);
 
     artist.subscriptionPlans.push({
       cycle: intervals.cycleLabel,
-      price: subscriptionPrice,
+      basePrice,
       stripePriceId: plans.stripePriceId,
       razorpayPlanId: plans.razorpayPlanId,
       paypalPlans: plans.paypalPlans

@@ -2,17 +2,16 @@ import { stripeProvider } from "../providers/stripeProvider.js";
 import { razorpayProvider } from "../providers/razorpayProvider.js";
 import { paypalProvider } from "../providers/paypalProvider.js";
 
-export const createSubscriptionPlans = async (artistName, price, intervals) => {
-  const {  razorpay, paypal } = intervals;
+export const createSubscriptionPlans = async (artistName, basePrice, cycle, convertedPrices) => {
+  const { razorpay, paypal } = cycle;
 
   // Parallel API calls
-  const [ razorpayPlanId, paypalPlans] = await Promise.all([
-    // stripeProvider.createPlan(artistName, price, stripe.interval, stripe.interval_count),
-    razorpayProvider.createPlan(artistName, price, razorpay.interval, razorpay.period),
-    paypalProvider.createPlans(artistName, price, paypal.interval_unit, paypal.interval_count)
+  const [razorpayPlanId, paypalPlans] = await Promise.all([
+    razorpayProvider.createPlan(artistName, basePrice.amount, razorpay.interval, razorpay.period, basePrice.currency),
+    paypalProvider.createPlans(artistName, basePrice, convertedPrices, paypal.interval_unit, paypal.interval_count),
   ]);
 
-  return { stripePriceId:null, razorpayPlanId, paypalPlans };
+  return { stripePriceId: null, razorpayPlanId, paypalPlans };
 };
 
 

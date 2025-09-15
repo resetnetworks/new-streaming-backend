@@ -4,18 +4,55 @@ import { customAlphabet } from "nanoid";
 
 const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 6);
 
-const subscriptionPlanSchema = new mongoose.Schema(
+// ----------------------
+// Currency Price Sub-Schema
+// ----------------------
+const priceSchema = new mongoose.Schema(
   {
-    cycle: {
+    currency: {
       type: String,
-      enum: ["1m", "3m", "6m", "12m"], // subscription cycle in months
       required: true,
+      uppercase: true,
+      minlength: 3,
+      maxlength: 3, // ISO currency code (INR, USD, EUR, etc.)
     },
-    price: {
+    amount: {
       type: Number,
       required: true,
       min: [0, "Price cannot be negative"],
     },
+  },
+  { _id: false }
+);
+
+const subscriptionPlanSchema = new mongoose.Schema(
+  {
+    cycle: {
+      type: String,
+      enum: ["1m", "3m", "6m", "12m"], // 1, 3, 6, or 12 months
+      required: true,
+    },
+
+    // 💰 Base price chosen by artist
+    basePrice: {
+      type: priceSchema,
+      required: true,
+    },
+
+    // 💰 Converted + locked prices in other currencies
+    convertedPrices: {
+      type: [priceSchema],
+      default: [],
+      validate: {
+        validator: function (prices) {
+          const currencies = prices.map((p) => p.currency.toUpperCase());
+          return new Set(currencies).size === currencies.length;
+        },
+        message: "Duplicate converted currencies are not allowed",
+      },
+    },
+
+    // 🔗 Gateway references
     razorpayPlanId: {
       type: String,
       required: [true, "Razorpay plan ID is required"],
@@ -28,12 +65,12 @@ const subscriptionPlanSchema = new mongoose.Schema(
     },
     paypalPlans: [
       {
-        currency: { type: String, required: true },
-        paypalPlanId: { type: String, required: true }
-      }
-    ]
+        currency: { type: String, required: true, uppercase: true },
+        paypalPlanId: { type: String, required: true },
+      },
+    ],
   },
-  { _id: false } // prevent extra _id for subdocs
+  { _id: false }
 );
 
 const artistSchema = new mongoose.Schema(

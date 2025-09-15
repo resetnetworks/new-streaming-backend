@@ -274,13 +274,11 @@ export const razorpayWebhook = async (req, res) => {
 
 
 export const paypalWebhook = async (req, res) => {
-  console.log("📡 PayPal webhook called");
-
+  console.log(":satellite_antenna: PayPal webhook called");
   try {
     const rawBody = req.body.toString();
     const webhookEvent = JSON.parse(rawBody);
-
-    // 🔑 Step 1: Verify PayPal signature
+    // :key: Step 1: Verify PayPal signature
     const webhookId = process.env.PAYPAL_WEBHOOK_ID;
     const verificationBody = {
       auth_algo: req.headers["paypal-auth-algo"],
@@ -291,15 +289,12 @@ export const paypalWebhook = async (req, res) => {
       webhook_id: webhookId,
       webhook_event: webhookEvent,
     };
-
     const baseUrl = process.env.PAYPAL_MODE === "live"
       ? "https://api-m.paypal.com"
       : "https://api-m.sandbox.paypal.com";
-
     const auth = Buffer.from(
       `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
     ).toString("base64");
-
     const tokenRes = await fetch(`${baseUrl}/v1/oauth2/token`, {
       method: "POST",
       headers: {
@@ -308,9 +303,7 @@ export const paypalWebhook = async (req, res) => {
       },
       body: "grant_type=client_credentials",
     });
-
     const { access_token } = await tokenRes.json();
-
     const verifyRes = await fetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
       method: "POST",
       headers: {
@@ -319,52 +312,40 @@ export const paypalWebhook = async (req, res) => {
       },
       body: JSON.stringify(verificationBody),
     });
-
     const verification = await verifyRes.json();
     console.log("verification", verification);
-
     if (verification.verification_status !== "SUCCESS") {
-      console.error("❌ Invalid PayPal signature");
+      console.error(":x: Invalid PayPal signature");
       return res.status(400).json({ message: "Invalid signature" });
     }
-
-    // ✅ Step 2: Process event
+    // :white_tick: Step 2: Process event
     const eventType = webhookEvent.event_type;
-    console.log(`📥 PayPal event received: ${eventType}`);
-
-    // 🔁 Subscription flow
+    console.log(`:inbox_tray: PayPal event received: ${eventType}`);
+    // :repeat: Subscription flow
     if (eventType === "BILLING.SUBSCRIPTION.ACTIVATED" || eventType === "BILLING.SUBSCRIPTION.RENEWED") {
       const subscriptionId = webhookEvent.resource.id;
-
       const transaction = await markTransactionPaid({
         gateway: "paypal",
         subscriptionId,
       });
-
       if (transaction) {
         await updateUserAfterPurchase(transaction, subscriptionId);
-        console.log("✅ PayPal subscription activated/renewed");
+        console.log(":white_tick: PayPal subscription activated/renewed");
       }
-
       return res.status(200).json({ status: "subscription processed" });
     }
-
-    // 💳 One-time payment flow
+    // :credit_card: One-time payment flow
     if (eventType === "PAYMENT.CAPTURE.COMPLETED" || eventType === "CHECKOUT.ORDER.APPROVED") {
       const { id: paymentId, purchase_units } = webhookEvent.resource;
-
       // We embed metadata in custom_id
       const notes = purchase_units?.[0]?.custom_id
         ? JSON.parse(purchase_units[0].custom_id)
         : {};
-
       const { type, itemId, userId } = notes;
-
       if (!type || !itemId || !userId) {
-        console.warn("⚠️ Missing metadata for one-time PayPal payment.");
+        console.warn(":warning: Missing metadata for one-time PayPal payment.");
         return res.status(200).send("OK");
       }
-
       const transaction = await markTransactionPaid({
         gateway: "paypal",
         paymentId,
@@ -372,31 +353,26 @@ export const paypalWebhook = async (req, res) => {
         itemId,
         type,
       });
-
       if (transaction) {
         await updateUserAfterPurchase(transaction, paymentId);
-        console.log("✅ One-time PayPal purchase completed:", type, itemId);
+        console.log(":white_tick: One-time PayPal purchase completed:", type, itemId);
       }
-
       return res.status(200).json({ status: "purchase processed" });
     }
-
-    // ❌ Subscription ended/cancelled
+    // :x: Subscription ended/cancelled
     if (eventType === "BILLING.SUBSCRIPTION.CANCELLED" || eventType === "BILLING.SUBSCRIPTION.EXPIRED") {
       await Subscription.findOneAndUpdate(
         { externalSubscriptionId: webhookEvent.resource.id },
         { status: "cancelled" }
       );
-      console.log("❌ PayPal subscription cancelled/expired.");
+      console.log(":x: PayPal subscription cancelled/expired.");
       return res.status(200).json({ status: "ok" });
     }
-
-    // 🔄 Default → just log
-    console.log("ℹ️ Ignored PayPal event:", eventType);
+    // :arrows_anticlockwise: Default → just log
+    console.log(":information_source: Ignored PayPal event:", eventType);
     return res.status(200).json({ status: "ignored" });
-
   } catch (err) {
-    console.error("❌ PayPal webhook processing failed:", err);
+    console.error(":x: PayPal webhook processing failed:", err);
     return res.status(500).json({ message: "Something went wrong, please try again later" });
   }
 };
