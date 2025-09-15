@@ -76,7 +76,7 @@ export const updateUserAfterPurchase = async (transaction, paymentId) => {
       p.itemType === transaction.itemType &&
       p.itemId.toString() === transaction.itemId.toString()
   );
-
+   console.log("transaction:", transaction);
   if (!alreadyInHistory) {
     user.purchaseHistory.push({
       itemType: transaction.itemType,

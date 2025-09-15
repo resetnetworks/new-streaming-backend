@@ -5,6 +5,7 @@ export const shapeArtistResponse = (artist) => {
   const plans = Array.isArray(artist.subscriptionPlans)
     ? artist.subscriptionPlans.map((p) => ({
         cycle: p.cycle,
+        basePrice: p.basePrice,
         price: p.price,
         razorpayPlanId: p.razorpayPlanId,
         stripePriceId: p.stripePriceId,

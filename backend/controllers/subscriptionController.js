@@ -353,3 +353,46 @@ export const createPaypalSubscription = async (req, res) => {
     approveUrl: approveLink,
   });
 };
+
+export const cancelPaypalSubscription = async (req, res) => {
+  const { subscriptionId } = req.params;
+  const user = req.user;
+
+  // ✅ Find the transaction
+  const transaction = await Transaction.findOne({
+    userId: user._id,
+    "metadata.paypalSubscriptionId": subscriptionId,
+    gateway: "paypal",
+  });
+
+  if (!transaction) throw new NotFoundError("Subscription transaction not found");
+
+  // ✅ Call PayPal API to cancel subscription
+  const token = await getPayPalAccessToken();
+  const response = await fetch(`${process.env.PAYPAL_API}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      reason: "User requested cancellation",
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`PayPal subscription cancellation failed: ${JSON.stringify(errorData)}`);
+  }
+
+  // ✅ Update transaction status
+  transaction.status = "cancelled";
+  transaction.cancelledAt = new Date();
+  await transaction.save();
+
+  res.json({
+    success: true,
+    message: "Subscription cancelled successfully",
+    subscriptionId,
+  });
+};

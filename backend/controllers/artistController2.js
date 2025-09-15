@@ -131,7 +131,7 @@ export const getAllArtists = async (req, res) => {
     };
 
     // 3. Save to cache (10 min TTL)
-    await setCached(cacheKey, response, 600);
+    await setCached(cacheKey, response, 240);
 
     res.status(StatusCodes.OK).json(response);
   } catch (err) {
