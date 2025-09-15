@@ -6,11 +6,11 @@ import {Song} from "../models/Song.js";
 import { Album } from "../models/Album.js";
 import { convertCurrencies } from "../utils/convertCurrencies.js";
 
-export const createArtistService = async ({ name, bio, location, imageUrl, subscriptionPrice, cycle, createdBy }) => {
+export const createArtistService = async ({ name, bio, location, imageUrl, basePrice, cycle, createdBy }) => {
   // Initialize artist object but do not save yet
   const artist = new Artist({ name, bio, location, image: imageUrl, subscriptionPlans: [], createdBy });
-  const basePrice = { currency: "USD", amount: 10 }; // default base price
-  subscriptionPrice = subscriptionPrice || 0;
+  // const basePrice = { currency: "USD", amount: 10 }; // default base price
+  const subscriptionPrice = basePrice.amount || 0;
   // If subscription exists, create plans
   if (subscriptionPrice && subscriptionPrice > 0) {
     const intervals = cycle; // cycleToInterval already called in controller

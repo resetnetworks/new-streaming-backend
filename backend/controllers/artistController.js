@@ -56,6 +56,7 @@ export const createArtist = async (req, res) => {
   }
 
   const { name, bio, location, subscriptionPrice, cycle } = req.body;
+  baseprice = { currency: "USD", amount: subscriptionPrice }; // default base price
 
   if (!name) throw new BadRequestError("Artist name is required.");
   if (!cycle) throw new BadRequestError("Subscription cycle is required (1m, 3m, 6m, 12m).");

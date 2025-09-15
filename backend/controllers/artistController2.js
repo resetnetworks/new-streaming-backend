@@ -20,13 +20,13 @@ export const createArtist = async (req, res) => {
 
   const imageFile = req.files?.coverImage?.[0];
   const imageUrl = imageFile?.location || "";
-
+  const basePrice = { currency: "USD", amount: subscriptionPrice }; // default base price
   const artist = await createArtistService({
     name,
     bio,
     location,
     imageUrl,
-    subscriptionPrice,
+    basePrice,
     cycle: intervals,
     createdBy: req.user._id
   });
@@ -145,6 +145,7 @@ export const getAllArtists = async (req, res) => {
 export const getArtistById = async (req, res) => {
   const identifier = req.params.id;
   const cacheKey = `artist:${identifier}`;
+  console.log("cacheKey:", cacheKey);
 
   try {
     // 1. Try cache first

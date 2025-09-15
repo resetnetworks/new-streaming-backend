@@ -56,35 +56,54 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
-  if (!user) throw new BadRequestError("No user exists with this email");
+  // 🔍 Find user with only required fields
+  const user = await User.findOne({ email }).select("+password +role");
+  
+  // Dummy hash (mitigates timing attacks when user not found)
+  const dummyHash =
+    "$2b$10$C.wq7D6vZT0eJZK3x7zCfuM8CyqOajwX4gO8hUO9gZ.2B0uB1dYx6";
+  const passwordToCompare = user ? user.password : dummyHash;
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw new BadRequestError("Incorrect password");
+  const isMatch = await bcrypt.compare(password, passwordToCompare);
 
-  // 🔒 Check active sessions
-  const activeSessions = await Session.find({ userId: user._id });
-  if (activeSessions.length >= 2) {
+  if (!user || !isMatch) {
+    throw new BadRequestError("Invalid email or password"); // unified error
+  }
+
+  // 🧹 Remove expired sessions first
+  await Session.deleteMany({
+    userId: user._id,
+    expiresAt: { $lt: new Date() },
+  });
+
+  // 🔒 Enforce max 2 active sessions
+  const activeSessions = await Session.countDocuments({ userId: user._id });
+  if (activeSessions >= 2) {
     throw new BadRequestError("Maximum 2 active logins allowed");
   }
 
-  // ✅ Generate token
-  const token = generateToken(user._id, res);
+  // ✅ Generate JWT
+  const rawToken = generateToken(user._id, res);
+
+  // ✅ Hash token before saving
+  const hashedToken = await bcrypt.hash(rawToken, 10);
 
   // ✅ Save session
   await Session.create({
     userId: user._id,
-    token,
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // example: 7d expiry
+    token: hashedToken,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7d expiry
     userAgent: req.headers["user-agent"],
-    ip: req.ip,
+    ip: req.headers["x-forwarded-for"] || req.ip,
   });
 
+  // 🧩 Shape user response (remove sensitive fields)
   const shapedUser = shapeUserResponse(user.toObject());
 
-  res.status(200).json({
+  // 📤 Send back token + shaped user
+  res.status(StatusCodes.OK).json({
     user: shapedUser,
-    token,
+    token: rawToken,
     message: "User logged in successfully",
   });
 };
@@ -136,22 +155,53 @@ export const myProfile = async (req, res) => {
 // @access  Private
 // ===================================================================
 export const logoutUser = async (req, res) => {
-  res.cookie("token", "", {
-    maxAge: 0,
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production", // Use secure flag in production
-  });
-  
-  
-  const token = req.cookies.token;
-  await Session.deleteOne({ token });
+  try {
+    // 🔑 Extract token from cookie or Authorization header
+    const rawToken =
+      req.cookies.token || req.headers.authorization?.split(" ")[1];
 
+    if (!rawToken) {
+      throw new BadRequestError("No token provided");
+    }
 
-  res.status(StatusCodes.OK).json({
-    message: "Logged Out Successfully",
-  });
+    // 🧹 Clean up expired sessions
+    await Session.deleteMany({ expiresAt: { $lt: new Date() } });
+
+    // 🔍 Find all sessions for this user
+    const sessions = await Session.find({ userId: req.user._id });
+
+    let sessionToDelete = null;
+    for (const session of sessions) {
+      const isMatch = await bcrypt.compare(rawToken, session.token); // compare against hashed token
+      if (isMatch) {
+        sessionToDelete = session._id;
+        break;
+      }
+    }
+
+    if (!sessionToDelete) {
+      throw new BadRequestError("Session not found or already logged out");
+    }
+
+    // ❌ Delete only this session
+    await Session.findByIdAndDelete(sessionToDelete);
+
+    // 🧹 Clear cookie if used
+    res.cookie("token", "", {
+      maxAge: 0,
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res.status(StatusCodes.OK).json({
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    throw new BadRequestError(err.message || "Logout failed");
+  }
 };
+
 
 
 

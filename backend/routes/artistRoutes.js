@@ -9,6 +9,7 @@ import {
   artistIdValidator,
 } from "../validators/artistValidators.js";
 import validate from "../middleware/validate.js";
+import { getAllArtistsWithoutPagination } from "../controllers/artistController.js";
 
 const router = express.Router();
 
@@ -48,7 +49,7 @@ router.delete(
 router.get("/", authenticateUser, getAllArtists);
 
 // Get all artists (no pagination)
-// router.get("/all", authenticateUser, getAllArtistsWithoutPagination);
+router.get("/all", authenticateUser, getAllArtistsWithoutPagination);
 
 // Get artist by ID
 router.get("/:id", authenticateUser, getArtistById);
