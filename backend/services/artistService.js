@@ -23,7 +23,8 @@ export const createArtistService = async ({ name, bio, location, imageUrl, baseP
       basePrice,
       stripePriceId: plans.stripePriceId,
       razorpayPlanId: plans.razorpayPlanId,
-      paypalPlans: plans.paypalPlans
+      paypalPlans: plans.paypalPlans,
+      convertedPrices
     });
   }
 

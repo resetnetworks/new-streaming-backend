@@ -15,6 +15,7 @@ export const shapeArtistResponse = (artist) => {
               paypalPlanId: pp.paypalPlanId,
             }))
           : [],
+        convertedPrices: p.convertedPrices || {}
       }))
     : [];
 

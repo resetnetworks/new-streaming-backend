@@ -1,15 +1,23 @@
 import fetch from "node-fetch";
 
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY"];
+const ZERO_DECIMAL_CURRENCIES = ["JPY", "KRW", "HUF", "VND"];
 
 import { getCached, setCached } from "../utils/cache.js";
 // import { SUPPORTED_CURRENCIES } from "../constants/currencies.js";
+
+function formatAmount(amount, currency) {
+  if (ZERO_DECIMAL_CURRENCIES.includes(currency)) {
+    return Math.round(amount); // no decimals allowed
+  }
+  return Math.round(amount * 100) / 100; // 2 decimals max
+}
 
 export async function convertCurrencies(baseCurrency, amount) {
   const cacheKey = `currencyRates:${baseCurrency}`;
 
   try {
-    // 1. First try fresh API call
+    // 1. Try fresh API call
     const res = await fetch(
       `https://api.freecurrencyapi.com/v1/latest?apikey=${process.env.FREECURRENCY_KEY}&base_currency=${baseCurrency}`
     );
@@ -24,10 +32,10 @@ export async function convertCurrencies(baseCurrency, amount) {
     // 2. Save rates to cache (1h TTL)
     await setCached(cacheKey, rates, 3600);
 
-    // 3. Return computed conversions
+    // 3. Return computed conversions with proper formatting
     return SUPPORTED_CURRENCIES.filter((c) => c !== baseCurrency).map((currency) => ({
       currency,
-      amount: Math.round(amount * rates[currency]),
+      amount: formatAmount(amount * rates[currency], currency),
     }));
   } catch (err) {
     console.error("❌ Currency API failed, falling back to cache:", err.message);
@@ -37,18 +45,17 @@ export async function convertCurrencies(baseCurrency, amount) {
     if (cachedRates) {
       return SUPPORTED_CURRENCIES.filter((c) => c !== baseCurrency).map((currency) => ({
         currency,
-        amount: Math.round(amount * cachedRates[currency]),
+        amount: formatAmount(amount * cachedRates[currency], currency),
       }));
     }
 
-    // 5. If no cache available → fail gracefully
+    // 5. If no cache → fail gracefully
     return SUPPORTED_CURRENCIES.filter((c) => c !== baseCurrency).map((currency) => ({
       currency,
-      amount: null, // or amount unchanged
+      amount: null,
     }));
   }
 }
-
 // utils/currencyConverter.js
 
 // Hardcoded conversion rates (relative to USD)
