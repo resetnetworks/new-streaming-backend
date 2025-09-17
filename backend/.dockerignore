@@ -1,5 +1,3 @@
-import { crossOriginEmbedderPolicy } from "helmet"
-
 node_modules
 npm-debug.log
 .env
@@ -10,3 +8,8 @@ tests
 uploads
 src
 features
+models
+
+//* something something something something somethjing something something jk;l
+
+

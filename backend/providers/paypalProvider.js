@@ -8,7 +8,10 @@ export const paypalProvider = {
 
     const allCurrencies = [basePrice, ...convertedPrices];
     const plans = await Promise.all(
-      allCurrencies.map(async ({ currency, amount }) => {
+      allCurrencies
+      .filter(({ currency }) => currency.toUpperCase() !== "INR")
+      .map(async ({ currency, amount }) => {
+        
         const planId = await createPayPalPlan({
           productId,
           price: amount,

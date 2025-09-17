@@ -124,6 +124,7 @@ export const createPaypalOrder = async (req, res) => {
     throw new BadRequestError("Invalid item type. Must be 'song' or 'album'.");
   }
 
+
   let artistId;
   if (itemType === "song") {
     const song = await Song.findById(itemId).select("artist");

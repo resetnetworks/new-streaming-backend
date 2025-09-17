@@ -14,6 +14,7 @@ import {getPayPalAccessToken} from "../utils/getPaypalAccessToken.js";
 import paypal from "@paypal/checkout-server-sdk";
 import  {paypalClient}  from "../utils/paypalClient.js";
 import { PAYPAL_API} from "../utils/getPaypalAccessToken.js";
+import { getSubscriptionAmount } from "../utils/getSubscriptionAmount.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export const initiateArtistSubscription = async (req, res) => {
@@ -153,7 +154,7 @@ if (subscription.latest_invoice && !subscription.latest_invoice.payment_intent) 
   });
 };
 
-export const cancelArtistSubscription = async (req, res) => {
+export const cancelArtistStripeSubscription = async (req, res) => {
   try {
     const { artistId } = req.params;
     const userId = req.user._id;
@@ -249,6 +250,8 @@ export const createRazorpaySubscription = async (req, res) => {
       throw new NotFoundError(`No Razorpay plan found for cycle ${cycle}`);
     }
 
+      const amount = getSubscriptionAmount(artist.subscriptionPlans[0], "INR");
+
     // ✅ Create Razorpay subscription
     const subscription = await razorpay.subscriptions.create({
       plan_id: plan.razorpayPlanId,
@@ -267,7 +270,7 @@ export const createRazorpaySubscription = async (req, res) => {
       itemType: "artist-subscription",
       itemId: artistId,
       artistId,
-      amount: plan.price, // per-cycle price (not multiplied, because Razorpay charges per cycle)
+      amount, // per-cycle price (not multiplied, because Razorpay charges per cycle)
       currency: "INR",
       gateway: "razorpay",
       status: "pending",
@@ -300,6 +303,8 @@ export const createPaypalSubscription = async (req, res) => {
   const plan = artist.subscriptionPlans.find((p) => p.cycle === cycle);
   if (!plan) throw new NotFoundError(`No plan for cycle ${cycle}`);
 
+  const amount = getSubscriptionAmount(artist.subscriptionPlans[0], currency);
+
   // ✅ pick correct PayPal plan for currency
   const paypalPlan = plan.paypalPlans?.find((pp) => pp.currency === currency);
   if (!paypalPlan) throw new BadRequestError(`No PayPal plan for ${currency}`);
@@ -331,12 +336,12 @@ export const createPaypalSubscription = async (req, res) => {
   const approveLink = subscription.links.find((l) => l.rel === "approve")?.href;
 
   // ✅ Save transaction in DB
-  await Transaction.create({
+  const transaction = await Transaction.create({
     userId: user._id,
     itemType: "artist-subscription",
     itemId: artistId,
     artistId,
-    amount: plan.price,
+    amount,
     currency,
     gateway: "paypal",
     status: "pending",
@@ -346,6 +351,7 @@ export const createPaypalSubscription = async (req, res) => {
       paypalPlanId: paypalPlan.paypalPlanId,
     },
   });
+  console.log("transaction", transaction)
 
   res.json({
     success: true,
@@ -395,4 +401,97 @@ export const cancelPaypalSubscription = async (req, res) => {
     message: "Subscription cancelled successfully",
     subscriptionId,
   });
+};
+
+// // src/controllers/subscriptionController.js
+// import fetch from "node-fetch";
+// import { Subscription } from "../models/Subscription.js";
+// import { Transaction } from "../models/Transaction.js";
+// import { razorpay } from "../config/razorpay.js";
+// import { getPayPalAccessToken } from "../utils/paypal.js";
+// import { BadRequestError, NotFoundError } from "../errors/index.js";
+
+export const cancelArtistSubscription = async (req, res) => {
+  try {
+    const { artistId } = req.params;
+    const user = req.user;
+
+    // ✅ Find active subscription
+    const subscription = await Subscription.findOne({
+      userId: user._id,
+      artistId,
+      status: "active",
+    });
+
+    if (!subscription) {
+      throw new NotFoundError("No active subscription found for this artist");
+    }
+
+    let gatewayResponse;
+    if (subscription.gateway === "razorpay") {
+      // ✅ Cancel Razorpay subscription
+      gatewayResponse = await razorpay.subscriptions.cancel(
+        subscription.externalSubscriptionId,
+        { cancel_at_cycle_end: 1 } // cancel but let current cycle run
+      );
+
+    } else if (subscription.gateway === "paypal") {
+      // ✅ Cancel PayPal subscription
+      const token = await getPayPalAccessToken();
+      const response = await fetch(
+        `${process.env.PAYPAL_API}/v1/billing/subscriptions/${subscription.externalSubscriptionId}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reason: "User requested cancellation",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `PayPal subscription cancellation failed: ${JSON.stringify(errorData)}`
+        );
+      }
+      gatewayResponse = await response.text();
+
+    } else {
+      throw new BadRequestError(`Unsupported gateway: ${subscription.gateway}`);
+    }
+
+    // ✅ Update subscription status
+    subscription.status = "cancelled";
+    subscription.cancelledAt = new Date();
+    subscription.isRecurring = false;
+    await subscription.save();
+
+    // ✅ Update transaction status too
+    await Transaction.updateMany(
+      {
+        userId: user._id,
+        artistId,
+        "metadata.*SubscriptionId": subscription.externalSubscriptionId,
+        gateway: subscription.gateway,
+        status: { $in: ["pending", "active"] },
+      },
+      {
+        $set: { status: "cancelled", cancelledAt: new Date() },
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "Subscription cancelled successfully",
+      gateway: subscription.gateway,
+      gatewayResponse,
+    });
+  } catch (error) {
+    console.error("❌ Cancel subscription error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };

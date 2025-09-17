@@ -107,6 +107,7 @@ export const updateUserAfterPurchase = async (transaction, paymentId) => {
    const fallbackExternalId =
   transaction.metadata?.externalSubscriptionId || // top priority
   transaction.metadata?.razorpaySubscriptionId || // fallback if above not present
+  transaction.metadata?.paypalSubscriptionId 
   transaction.stripeSubscriptionId ||
   transaction.paymentIntentId ||
   transaction.razorpayOrderId ||
