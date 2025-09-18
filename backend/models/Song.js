@@ -54,11 +54,16 @@ const songSchema = new mongoose.Schema(
       enum: ["free", "subscription", "purchase-only"],
       default: "subscription",
      },
-     price: {
-     type: Number,
-     default: 0,
-     min: 0,
+     basePrice: {
+      currency: { type: String },
+      amount: { type: Number },
     },
+  convertedPrices: [
+    { 
+      _id:false,
+      currency: { type: String },
+      amount: { type: Number },
+    },],
     audioUrl: {
       type: String,
       required: [true, "Audio URL is required"],

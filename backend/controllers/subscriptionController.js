@@ -468,6 +468,18 @@ export const cancelArtistSubscription = async (req, res) => {
     subscription.status = "cancelled";
     subscription.cancelledAt = new Date();
     subscription.isRecurring = false;
+    if (!subscription.cycle) {
+  const txn = await Transaction.findOne({
+    userId: user._id,
+    artistId,
+    gateway: subscription.gateway,
+    "metadata.cycle": { $exists: true },
+  }).lean();
+
+  if (txn?.metadata?.cycle) {
+    subscription.cycle = txn.metadata.cycle;
+  }
+}
     await subscription.save();
 
     // ✅ Update transaction status too

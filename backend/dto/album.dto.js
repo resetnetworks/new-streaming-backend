@@ -6,7 +6,8 @@ export const shapeAlbumResponse = (album) => ({
   description: album.description,
   releaseDate: album.releaseDate,
   accessType: album.accessType,
-  price: album.price,
+  basePrice: album.basePrice,
+  convertedPrices: album.convertedPrices || [],
   artist: album.artist
     ? {
         _id: album.artist._id,

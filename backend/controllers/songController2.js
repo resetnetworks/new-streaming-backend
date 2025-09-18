@@ -4,6 +4,7 @@ import { isAdmin } from "../utils/authHelper.js";
 import { createSong as createSongService } from "../services/songService.js";
 import { uploadAudioFile, getCoverImage } from "../services/fileService.js";
 import { shapeSongResponse } from "../dto/song.dto.js";
+import { convertCurrencies } from "../utils/convertCurrencies.js";
 
 
 export const createSong = async (req, res) => {
@@ -14,12 +15,13 @@ export const createSong = async (req, res) => {
     artist,
     genre,
     duration,
-    price,
+    basePrice,
     accessType,
     releaseDate,
     albumOnly,
     album
   } = req.body;
+  console.log("Request Body:", basePrice);
 
   if (!title || !artist || !duration) {
     throw new Error("Title, artist, and duration are required");
@@ -32,6 +34,10 @@ export const createSong = async (req, res) => {
   // File handling
   const audioUrl = await uploadAudioFile(req.files?.audio?.[0]);
   const coverImageUrl = await getCoverImage(req.files?.coverImage?.[0], album);
+  let bp = JSON.parse(basePrice);
+  console.log(bp, bp.currency, bp.amount);
+
+  const convertedPrices = basePrice ? await convertCurrencies(bp.currency, bp.amount) : [];
 
   // Create song
   const newSong = await createSongService({
@@ -40,11 +46,12 @@ export const createSong = async (req, res) => {
       artist,
       genre: genreArray,
       duration,
-      price: parseFloat(price),
+      basePrice : bp,
       accessType,
       releaseDate,
       albumOnly: albumOnlyBool,
       album,
+      convertedPrices
     },
     audioUrl,
     coverImageUrl

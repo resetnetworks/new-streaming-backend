@@ -92,6 +92,7 @@ function formatAmount(amount, currency) {
  * Convert amount from baseCurrency to supported currencies
  */
 export async function convertCurrencies(baseCurrency, amount) {
+  console.log("Converting", amount, baseCurrency);
   if (!HARDCODED_RATES[baseCurrency]) {
     throw new Error(`Unsupported base currency: ${baseCurrency}`);
   }

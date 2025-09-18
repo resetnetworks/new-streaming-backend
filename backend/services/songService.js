@@ -3,8 +3,9 @@ import { Album } from "../models/Album.js";
 import mongoose from "mongoose";
 // import { songDeletionQueue } from "../queue/songDeletionQueue.js";
 
-export const calculatePrice = ({ accessType, price, albumOnly }) => {
-  if (accessType === "purchase-only") return albumOnly ? 0 : price;
+export const calculatePrice = ({ accessType, basePrice, albumOnly }) => {
+  console.log("Calculating price for:", { accessType, basePrice, albumOnly });
+  if (accessType === "purchase-only") return albumOnly ? 0 : basePrice;
   return 0;
 };
 
@@ -22,14 +23,15 @@ export const createSong = async ({ data, audioUrl, coverImageUrl }) => {
       genre: data.genre,
       duration: data.duration,
       accessType: data.accessType || "subscription",
-      price: finalPrice,
+      basePrice: finalPrice,
       releaseDate: data.releaseDate,
       coverImage: coverImageUrl,
       albumOnly: data.albumOnly || false,
       audioUrl,
+      convertedPrices: data.convertedPrices || [],
       audioKey: audioUrl.split("/").pop().replace(/\.[^/.]+$/, ""),
     }], { session });
-
+    console.log("New Song Created:", newSong);
     if (data.album) {
       await Album.findByIdAndUpdate(
         data.album,

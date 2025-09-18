@@ -1,4 +1,5 @@
 import { Album } from "../models/Album.js";
+
 import { Song } from "../models/Song.js";
 import {
   BadRequestError,
@@ -12,6 +13,7 @@ import { uploadToS3 } from "../utils/s3Uploader.js";
 import { Artist } from "../models/Artist.js";
 import { shapeAlbumResponse } from "../dto/album.dto.js";
 import { hasAccessToSong } from "../utils/accessControl.js";
+import { convertCurrencies } from "../utils/convertCurrencies.js";
 
 // Album Controllers
 
@@ -25,7 +27,7 @@ export const createAlbum = async (req, res) => {
   }
 
   // 📥 Extract data
-  const { title, description, artist, releaseDate, price, accessType, genre } =
+  const { title, description, artist, releaseDate, basePrice, accessType, genre } =
     req.body;
 
   // ✅ Required validation
@@ -34,7 +36,7 @@ export const createAlbum = async (req, res) => {
   }
 
   // 💰 Validate price if purchase-only
-  if (accessType === "purchase-only" && (!price || price <= 0)) {
+  if (accessType === "purchase-only" && (!basePrice.amount || basePrice <= 0)) {
     throw new BadRequestError("Purchase-only albums must have a valid price.");
   }
 
@@ -46,6 +48,8 @@ export const createAlbum = async (req, res) => {
   const processedGenre =
     typeof genre === "string" ? genre.split(",").map((g) => g.trim()) : genre;
 
+    const convertedPrices = basePrice.amount ? await convertCurrencies(basePrice.currency, basePrice.amount) : [];
+
   // 📦 Create album
   const newAlbum = await Album.create({
     title,
@@ -53,10 +57,12 @@ export const createAlbum = async (req, res) => {
     artist,
     releaseDate,
     accessType: accessType || "subscription",
-    price: accessType === "purchase-only" ? price : 0,
+    basePrice: accessType === "purchase-only" ? basePrice : {},
+    convertedPrices: accessType === "purchase-only" ? convertedPrices : [],
     coverImage: coverImageUrl,
     genre: processedGenre,
   });
+  console.log("New Album Created:", newAlbum);
 
   // 🎯 Return shaped response
   const shaped = shapeAlbumResponse(newAlbum);
