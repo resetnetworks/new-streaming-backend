@@ -172,8 +172,11 @@ export const razorpayWebhook = async (req, res) => {
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     const signature = req.headers["x-razorpay-signature"];
-    const rawBody = req.body; // Buffer due to express.raw()
+    const rawBody = req.body; // express.raw()
 
+    // ---------------------------
+    // 1️⃣ Verify signature
+    // ---------------------------
     const expectedSignature = crypto
       .createHmac("sha256", secret)
       .update(rawBody)
@@ -188,6 +191,9 @@ export const razorpayWebhook = async (req, res) => {
     const event = eventData.event;
     console.log(`📥 Razorpay event received: ${event}`);
 
+    // ---------------------------
+    // 2️⃣ Payment Captured (One-time or subscription)
+    // ---------------------------
     if (event === "payment.captured") {
       const paymentEntity = eventData.payload.payment.entity;
       const paymentId = paymentEntity.id;
@@ -201,8 +207,8 @@ export const razorpayWebhook = async (req, res) => {
         subscriptionId = invoice.subscription_id;
       }
 
-      // 🔁 Subscription flow
       if (subscriptionId) {
+        // Subscription payment
         const transaction = await markTransactionPaid({
           gateway: "razorpay",
           paymentId,
@@ -212,58 +218,100 @@ export const razorpayWebhook = async (req, res) => {
 
         if (transaction) {
           await updateUserAfterPurchase(transaction, subscriptionId);
-          console.log("✅ Subscription activated/renewed");
+          console.log("✅ Subscription payment processed:", subscriptionId);
         }
 
-        return res.status(200).json({ status: "subscription processed" });
+        return res.status(200).json({ status: "subscription payment processed" });
       }
 
-      // 💳 One-time payment flow
+      // One-time payment
       const { itemType: type, itemId, userId } = fullPayment.notes || {};
+      if (type && itemId && userId) {
+        const transaction = await markTransactionPaid({
+          gateway: "razorpay",
+          paymentId,
+          userId,
+          itemId,
+          type,
+          razorpayOrderId,
+        });
 
-      if (!type || !itemId || !userId) {
+        if (transaction) {
+          await updateUserAfterPurchase(transaction, paymentId);
+          console.log("✅ One-time purchase completed:", type, itemId);
+        }
+      } else {
         console.warn("⚠️ Missing metadata for one-time payment.");
-        return res.status(200).send("OK");
       }
 
-      const transaction = await markTransactionPaid({
-        gateway: "razorpay",
-        paymentId,
-        userId,
-        itemId,
-        type,
-        razorpayOrderId,
-      });
+      return res.status(200).json({ status: "payment processed" });
+    }
 
-      if (transaction) {
-        await updateUserAfterPurchase(transaction, paymentId);
-        console.log("✅ One-time purchase completed:", type, itemId);
+    // ---------------------------
+    // 3️⃣ Subscription events
+    // ---------------------------
+    const subscriptionEvents = [
+      "subscription.activated",
+      "subscription.charged",
+      "subscription.cancelled",
+      "subscription.halted",
+      "subscription.completed",
+      "subscription.authenticated",
+    ];
+
+    if (subscriptionEvents.includes(event)) {
+      const subId = eventData.payload.subscription.entity.id;
+
+      // Fetch latest subscription from Razorpay to get ground-truth status
+      const subEntity = await razorpay.subscriptions.fetch(subId);
+      const status = subEntity.status; // "active", "completed", "cancelled", "halted", etc.
+
+      switch (status) {
+        case "active":
+          await Subscription.findOneAndUpdate(
+            { externalSubscriptionId: subId },
+            { status: "active" }
+          );
+          console.log("✅ Subscription active:", subId);
+          break;
+
+        case "completed":
+          await Subscription.findOneAndUpdate(
+            { externalSubscriptionId: subId },
+            { status: "completed" }
+          );
+          console.log("✅ Subscription lifecycle completed:", subId);
+          break;
+
+        case "cancelled":
+        case "halted":
+          await Subscription.findOneAndUpdate(
+            { externalSubscriptionId: subId },
+            { status: "cancelled" }
+          );
+          console.log("❌ Subscription cancelled/halted:", subId);
+          break;
+
+        default:
+          console.log("ℹ️ Subscription event ignored:", subId, "status:", status);
       }
 
-      return res.status(200).json({ status: "purchase processed" });
+      return res.status(200).json({ status: "subscription event processed" });
     }
 
-    // 🔄 Recurring subscription charge (not used for logic, just logging)
-    if (event === "subscription.charged") {
-      console.log("🔄 Subscription charged:", eventData.payload.subscription.entity.id);
-    }
-
-    // ❌ Subscription ended
-    if (event === "subscription.halted" || event === "subscription.completed") {
-      await Subscription.findOneAndUpdate(
-        { externalSubscriptionId: eventData.payload.subscription.entity.id },
-        { status: "cancelled" }
-      );
-      console.log("❌ Subscription cancelled or completed.");
-    }
-
-    return res.status(200).json({ status: "ok" });
+    // ---------------------------
+    // 4️⃣ Ignore unknown events
+    // ---------------------------
+    console.log("⚠️ Ignored unknown event:", event);
+    return res.status(200).json({ status: "ignored" });
 
   } catch (err) {
     console.error("❌ Webhook processing failed:", err);
-    return res.status(500).json({ message: "Something went wrong, please try again later" });
+    return res.status(500).json({ message: "Something went wrong" });
   }
 };
+
+
 
 
 

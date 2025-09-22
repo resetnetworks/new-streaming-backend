@@ -255,7 +255,7 @@ export const createRazorpaySubscription = async (req, res) => {
     // ✅ Create Razorpay subscription
     const subscription = await razorpay.subscriptions.create({
       plan_id: plan.razorpayPlanId,
-      total_count: cycle === "1m" ? 1 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12, // number of billing cycles
+      total_count: cycle === "1m" ? 12 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12, // number of billing cycles
       customer_notify: 1,
       notes: {
         userId: user._id.toString(),
