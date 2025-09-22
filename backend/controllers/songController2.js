@@ -21,8 +21,7 @@ export const createSong = async (req, res) => {
     albumOnly,
     album
   } = req.body;
-  // let basePrice = {"amount":price,"currency":"USD"};
-  console.log("Request Body:", req.body);
+
 
   if (!title || !artist || !duration) {
     throw new Error("Title, artist, and duration are required");
@@ -35,10 +34,9 @@ export const createSong = async (req, res) => {
   // File handling
   const audioUrl = await uploadAudioFile(req.files?.audio?.[0]);
   const coverImageUrl = await getCoverImage(req.files?.coverImage?.[0], album);
-  let bp = JSON.parse(basePrice);
-  console.log(bp, bp.currency, bp.amount);
+  
 
-  const convertedPrices = basePrice ? await convertCurrencies(bp.currency, bp.amount) : [];
+  const convertedPrices = basePrice ? await convertCurrencies(basePrice.currency, basePrice.amount) : [];
 
   // Create song
   const newSong = await createSongService({
@@ -47,7 +45,7 @@ export const createSong = async (req, res) => {
       artist,
       genre: genreArray,
       duration,
-      basePrice : bp,
+      basePrice : basePrice ? parseFloat(basePrice) : 0,
       accessType,
       releaseDate,
       albumOnly: albumOnlyBool,
