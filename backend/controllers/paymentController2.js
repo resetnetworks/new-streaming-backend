@@ -117,8 +117,10 @@ const razorpayOrder = await createRazorpayOrderUtil(amount, userId, itemType, it
 
 
 export const createPaypalOrder = async (req, res) => {
-  const { itemType, itemId, amount, currency = "USD" } = req.body;
+  const { itemType, itemId, price } = req.body;
   const userId = req.user._id;
+  const amount  = price.amount;
+  const currency = price.currency || "USD";
 
   if (!["song", "album"].includes(itemType)) {
     throw new BadRequestError("Invalid item type. Must be 'song' or 'album'.");

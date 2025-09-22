@@ -94,7 +94,7 @@ export const createRazorpayOrder = async (req, res) => {
       //    return res.status(400).json({ "message" : "No active subscription found for this artist.", artistId });
 
   // ✅ Create Razorpay Order
-const razorpayOrder = await createRazorpayOrderUtil(amount, userId, itemType, itemId);
+const razorpayOrder = await createRazorpayOrderUtil(amount, userId, itemType, itemId, {}, currency);
   
   
   

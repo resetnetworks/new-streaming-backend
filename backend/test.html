@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    input, button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      font-size: 16px;
+    }
+    button {
+      cursor: pointer;
+      background: #007bff;
+      border: none;
+      color: white;
+      border-radius: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #message {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h2>Send Test Invoice</h2>
+  <p>Enter an email address to send a test invoice PDF.</p>
+
+  <input type="email" id="email" placeholder="Enter email address" required />
+  <button onclick="sendInvoice()">Send Invoice</button>
+
+  <p id="message"></p>
+
+  <script>
+    async function sendInvoice() {
+      const email = document.getElementById("email").value;
+      const messageEl = document.getElementById("message");
+
+      if (!email) {
+        messageEl.textContent = "❌ Please enter an email address.";
+        return;
+      }
+
+      messageEl.textContent = "⏳ Sending invoice...";
+
+      try {
+        const res = await fetch("http://localhost:4000/send-invoice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          messageEl.textContent = "✅ Invoice sent successfully to " + email;
+        } else {
+          messageEl.textContent = "❌ Error: " + data.error;
+        }
+      } catch (err) {
+        messageEl.textContent = "❌ Request failed: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>

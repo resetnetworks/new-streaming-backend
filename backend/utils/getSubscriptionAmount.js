@@ -3,7 +3,7 @@ export const getSubscriptionAmount = (subscriptionPlan, currency) => {
   if (!subscriptionPlan) throw new Error("Subscription plan not provided");
   if (!currency) throw new Error("Currency not provided");
 
-  console.log("Getting subscription amount for plan:", subscriptionPlan, "and currency:", currency);
+ 
 
   const normalizedCurrency = currency.toUpperCase();
 

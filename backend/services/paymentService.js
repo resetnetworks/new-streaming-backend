@@ -82,9 +82,12 @@ export const updateUserAfterPurchase = async (transaction, paymentId) => {
       itemType: transaction.itemType,
       itemId: transaction.itemId,
       price: transaction.amount,
+      amount: transaction.amount,
+      currency: transaction.currency,
       paymentId,
     });
   }
+  console.log("Updating user purchase history for user:", user);
 
   switch (transaction.itemType) {
     case "song":

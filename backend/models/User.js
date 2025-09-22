@@ -112,6 +112,14 @@ const schema = new mongoose.Schema({
         required: true,
         refPath: "purchaseHistory.itemType",
       },
+      currency: {
+        type: String,
+        required: true,
+      },
+      amount: {
+        type: Number,
+        required: true,
+      },
       price: {
         type: Number,
         required: true,

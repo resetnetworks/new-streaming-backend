@@ -21,7 +21,8 @@ export const createSong = async (req, res) => {
     albumOnly,
     album
   } = req.body;
-  console.log("Request Body:", basePrice);
+  // let basePrice = {"amount":price,"currency":"USD"};
+  console.log("Request Body:", req.body);
 
   if (!title || !artist || !duration) {
     throw new Error("Title, artist, and duration are required");

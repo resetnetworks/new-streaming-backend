@@ -6,6 +6,9 @@ import { Subscription } from "../models/Subscription.js";
 import { Artist } from "../models/Artist.js";
 import { BadRequestError, NotFoundError } from "../errors/index.js";
 
+import { EXCHANGE_RATES } from "../utils/priceInUSD.js";
+
+
 // ✅ 1. Get all transactions for a specific artist (with optional filters)
 export const getAllTransactionsByArtist = async (req, res) => {
   const { artistId } = req.query;
@@ -23,8 +26,22 @@ export const getAllTransactionsByArtist = async (req, res) => {
     if (endDate) query.createdAt.$lte = new Date(endDate);
   }
 
-  const transactions = await Transaction.find(query).sort({ createdAt: -1 });
-  res.status(StatusCodes.OK).json({ success: true, count: transactions.length, transactions });
+  const transactions = await Transaction.find(query).sort({ createdAt: -1 }).lean();;
+    // Add USD amount
+  const enriched = transactions.map((txn) => {
+    const rate = EXCHANGE_RATES[txn.currency] ?? 1; // default 1 if USD or missing
+    const amountInUSD = txn.amount ? Number((txn.amount * rate).toFixed(2)) : 0;
+
+    return {
+      ...txn,
+      amountInUSD,
+    };
+  });
+  console.log("enriched transactions:", enriched);
+
+  res
+    .status(StatusCodes.OK)
+    .json({ success: true, count: enriched.length, transactions: enriched });
 };
 
 // ✅ 2. Get all purchased songs for an artist
@@ -100,6 +117,7 @@ export const getArtistRevenueSummary = async (req, res) => {
     artistId,
     status: "paid",
   });
+  
 
   let songRevenue = 0;
   let albumRevenue = 0;
@@ -107,15 +125,18 @@ export const getArtistRevenueSummary = async (req, res) => {
 
   for (const txn of transactions) {
     if (txn.itemType === "song") {
-      songRevenue += txn.amount;
+      songRevenue += txn.amount ? EXCHANGE_RATES[txn.currency] * txn.amount : 0;
     } else if (txn.itemType === "album") {
-      albumRevenue += txn.amount;
+      albumRevenue += txn.amount ?  EXCHANGE_RATES[txn.currency] * txn.amount : 0;
     } else if (txn.itemType === "artist-subscription") {
-      subscriptionRevenue += txn.amount;
+      subscriptionRevenue += txn.amount?  EXCHANGE_RATES[txn.currency] * txn.amount : 0;
     }
   }
 
   const totalRevenue = songRevenue + albumRevenue + subscriptionRevenue;
+  
+ 
+
 
   return res.status(StatusCodes.OK).json({
     success: true,

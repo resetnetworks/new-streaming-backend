@@ -10,6 +10,14 @@ const HARDCODED_RATES = {
   JPY: { USD: 0.0068, EUR: 0.0063, GBP: 0.0054, INR: 0.57 },
   INR: { USD: 0.012, EUR: 0.011, GBP: 0.0094, JPY: 1.76 },
 };
+
+export const EXCHANGE_RATES = {
+  USD: 1,          // base
+  INR: 0.012,      // 1 INR ≈ 0.012 USD
+  GBP: 1.24,       // 1 GBP ≈ 1.24 USD
+  EUR: 1.07,       // 1 EUR ≈ 1.07 USD
+  JPY: 0.0067      // 1 JPY ≈ 0.0067 USD
+};
 // import { getCached, setCached } from "../utils/cache.js";
 // // import { SUPPORTED_CURRENCIES } from "../constants/currencies.js";
 
