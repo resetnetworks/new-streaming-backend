@@ -27,9 +27,12 @@ export const createAlbum = async (req, res) => {
   }
 
   // 📥 Extract data
-  const { title, description, artist, releaseDate, basePrice, accessType, genre } =
+  const { title, description, artist, releaseDate,  accessType, genre } =
     req.body;
-
+    let { basePrice } = req.body;
+ if(typeof basePrice === "string"){
+  basePrice = JSON.parse(basePrice);
+ }
   // ✅ Required validation
   if (!title || !artist || !releaseDate) {
     throw new BadRequestError("Title, artist, and release date are required.");
@@ -61,6 +64,7 @@ export const createAlbum = async (req, res) => {
     convertedPrices: accessType === "purchase-only" ? convertedPrices : [],
     coverImage: coverImageUrl,
     genre: processedGenre,
+    price:12
   });
   console.log("New Album Created:", newAlbum);
 
@@ -251,11 +255,11 @@ export const getAlbumsByArtist = async (req, res) => {
       .sort({ releaseDate: -1 })
       .skip(skip)
       .limit(limit)
-      .select("title slug coverImage releaseDate accessType price")
+      .select("title slug coverImage releaseDate accessType basePrice convertedPrices")
       .lean(),
     Album.countDocuments({ artist: artist._id }),
   ]);
-
+ console.log("Albums for artist:", albums);
   // 🧠 Shape albums for frontend + inject artist info into each album
   const shapedAlbums = albums.map((album) => ({
     ...shapeAlbumResponse(album),

@@ -45,7 +45,7 @@ export const createSong = async (req, res) => {
       artist,
       genre: genreArray,
       duration,
-      basePrice : basePrice ? parseFloat(basePrice) : 0,
+      basePrice : basePrice ? { amount: parseFloat(basePrice.amount), currency: basePrice.currency } : null,
       accessType,
       releaseDate,
       albumOnly: albumOnlyBool,

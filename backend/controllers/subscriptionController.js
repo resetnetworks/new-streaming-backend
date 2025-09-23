@@ -232,9 +232,10 @@ export const createRazorpaySubscription = async (req, res) => {
     const { artistId } = req.params;
     const { cycle } = req.body; // "1m", "3m", "6m", "12m"
     const user = req.user;
+  
 
     // Validate cycle
-    const validCycles = ["1m", "3m", "6m", "12m"];
+    const validCycles = [ "1m", "3m", "6m", "12m"];
     if (!validCycles.includes(cycle)) {
       throw new BadRequestError("Invalid subscription cycle. Use 1m, 3m, 6m, or 12m.");
     }
@@ -255,7 +256,7 @@ export const createRazorpaySubscription = async (req, res) => {
     // ✅ Create Razorpay subscription
     const subscription = await razorpay.subscriptions.create({
       plan_id: plan.razorpayPlanId,
-      total_count: cycle === "1m" ? 12 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12, // number of billing cycles
+      total_count: cycle === "1m" ? 12 : cycle === "3m" ? 4 : cycle === "6m" ? 2 : 12, // number of billing cycles
       customer_notify: 1,
       notes: {
         userId: user._id.toString(),

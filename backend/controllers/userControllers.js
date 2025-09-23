@@ -7,6 +7,7 @@ import { StatusCodes } from 'http-status-codes';
 import { BadRequestError, UnauthorizedError, } from "../errors/index.js";
 import { shapeUserResponse } from "../dto/user.dto.js";
 import Session from "../models/Session.js";
+import { log } from "console";
 
 // ===================================================================
 // @desc    Register a new user
@@ -78,7 +79,7 @@ export const loginUser = async (req, res) => {
 
   // 🔒 Enforce max 2 active sessions
   const activeSessions = await Session.countDocuments({ userId: user._id });
-  if (activeSessions >= 2) {
+  if (activeSessions >= 4) {
     throw new BadRequestError("Maximum 2 active logins allowed");
   }
 
@@ -213,6 +214,8 @@ export const logoutUser = async (req, res) => {
 // @access  Private
 // ===================================================================
 export const likeSong = async (req, res) => {
+  console.log("hello");
+  
   const user = await User.findById(req.user._id);
   if (!user) {
     throw new NotFoundError("User not found");
