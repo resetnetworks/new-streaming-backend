@@ -50,8 +50,9 @@ export const createAlbum = async (req, res) => {
   // 🎵 Normalize genre field
   const processedGenre =
     typeof genre === "string" ? genre.split(",").map((g) => g.trim()) : genre;
-
-    const convertedPrices = basePrice.amount ? await convertCurrencies(basePrice.currency, basePrice.amount) : [];
+    let convertedPrices = [];
+   if(accessType==="purchase-only")
+     convertedPrices = basePrice.amount ? await convertCurrencies(basePrice.currency, basePrice.amount) : [];
 
   // 📦 Create album
   const newAlbum = await Album.create({

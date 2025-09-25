@@ -14,6 +14,7 @@ import fetch from "node-fetch";
 import { transactionRepository } from "../repositories/transaction.js";
 import { subscriptionRepository } from "../repositories/subscription.js";
 import { userRepository } from "../repositories/user.js";
+import {processAndSendInvoice} from "../services/invoiceService.js";
 
 
 const razorpay = new Razorpay({
@@ -220,6 +221,8 @@ export const razorpayWebhook = async (req, res) => {
           await updateUserAfterPurchase(transaction, subscriptionId);
           console.log("✅ Subscription payment processed:", subscriptionId);
         }
+        await processAndSendInvoice(transaction);
+        console.log("📧 Invoice emailed to user for subscription:", subscriptionId);
 
         return res.status(200).json({ status: "subscription payment processed" });
       }
@@ -239,6 +242,8 @@ export const razorpayWebhook = async (req, res) => {
         if (transaction) {
           await updateUserAfterPurchase(transaction, paymentId);
           console.log("✅ One-time purchase completed:", type, itemId);
+          await processAndSendInvoice(transaction);
+          console.log("📧 Invoice emailed to user for one-time purchase:", type, itemId);
         }
       } else {
         console.warn("⚠️ Missing metadata for one-time payment.");
@@ -322,7 +327,7 @@ export const razorpayWebhook = async (req, res) => {
 
 
 export const paypalWebhook = async (req, res) => {
-  console.log(":satellite_antenna: PayPal webhook called");
+  console.log("satellite_antenna: PayPal webhook called");
   try {
     const rawBody = req.body.toString();
     const webhookEvent = JSON.parse(rawBody);
@@ -368,7 +373,7 @@ export const paypalWebhook = async (req, res) => {
     }
     // :white_tick: Step 2: Process event
     const eventType = webhookEvent.event_type;
-    console.log(`:inbox_tray: PayPal event received: ${eventType}`);
+    console.log(`inbox_tray: PayPal event received: ${eventType}`);
     // :repeat: Subscription flow
     if (eventType === "BILLING.SUBSCRIPTION.ACTIVATED" || eventType === "BILLING.SUBSCRIPTION.RENEWED") {
       const subscriptionId = webhookEvent.resource.id;
@@ -378,6 +383,7 @@ export const paypalWebhook = async (req, res) => {
       });
       if (transaction) {
         await updateUserAfterPurchase(transaction, subscriptionId);
+        await processAndSendInvoice(transaction);
         console.log(":white_tick: PayPal subscription activated/renewed");
       }
       return res.status(200).json({ status: "subscription processed" });
@@ -403,10 +409,14 @@ export const paypalWebhook = async (req, res) => {
       });
       if (transaction) {
         await updateUserAfterPurchase(transaction, paymentId);
-        console.log(":white_tick: One-time PayPal purchase completed:", type, itemId);
+        await processAndSendInvoice(transaction);
+        console.log("white_tick: One-time PayPal purchase completed:", type, itemId);
       }
       return res.status(200).json({ status: "purchase processed" });
     }
+
+     // 🔹 Step 3: Invoice service
+ 
     // :x: Subscription ended/cancelled
     if (eventType === "BILLING.SUBSCRIPTION.CANCELLED" || eventType === "BILLING.SUBSCRIPTION.EXPIRED") {
       await Subscription.findOneAndUpdate(

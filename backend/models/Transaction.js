@@ -13,6 +13,7 @@ const transactionSchema = new mongoose.Schema({
   razorpayOrderId: String,         // Razorpay
   stripeSubscriptionId: String,    // For Stripe recurring subs
   paypalOrderId: String,
+  invoiceNumber: String,      // ✅ Store generated invoice number
   metadata: { type: Object, default: {} }, // ✅ Flexible key-value storage
 }, { timestamps: true }); // ✅ adds createdAt & updatedAt
 export const Transaction =  mongoose.model("Transaction", transactionSchema);

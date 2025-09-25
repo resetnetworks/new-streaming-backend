@@ -1,18 +1,19 @@
 // File: server.js
-import dotenv from 'dotenv';
-dotenv.config();
+// import dotenv from 'dotenv';
+// dotenv.config();
 
 import mongoose from 'mongoose';
 import connectDb from './database/db.js';
 import app from './app.js';
 import gracefulShutdown from './middleware/gracefulShutdown.js';
+import config from "./config/index.js";
 
-const port = process.env.PORT || 4000;
+const port = config.PORT || 4000;
 let server;
 
 const start = async () => {
   try {
-    if (!process.env.MONGO_URL || !process.env.PORT) {
+    if (!config.MONGO_URL || !config.PORT) {
       console.error('❌ Missing required environment variables');
       process.exit(1);
     }
