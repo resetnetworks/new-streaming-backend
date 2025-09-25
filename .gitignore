@@ -6,3 +6,6 @@ backend/.cloudfront-private.pem
 paypal-onetime-payment.html
 paypaltest.html
 test-paypal-subscrription.html
+/backend/.env.development
+/backend/.env.staging
+/backend/.env.production
